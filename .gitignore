@@ -128,4 +128,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 watermark_reliability_release/dataset/
-watermark_reliability_release/output
+watermark_reliability_release/output/
+watermark_reliability_release/figure_notebooks/
