@@ -20,11 +20,12 @@ from functools import partial
 from tqdm import tqdm
 import wandb
 
+# 给出hunggingface缓存路径
 print(f"Current huggingface cache dir: {os.environ['HF_HOME']}")
 
 # HF classses
 from transformers import LogitsProcessorList, DataCollatorWithPadding
-
+import torch
 # better bool flag type for argparse
 from utils.submitit import str2bool
 
@@ -51,6 +52,7 @@ def main(args):
     # Start logging
     ###########################################################################
     # storing slurm info to allow auditing logfiles later
+    # 启动日志服务
     args.SLURM_JOB_ID = os.getenv("SLURM_JOB_ID")
     args.SLURM_ARRAY_JOB_ID = os.getenv("SLURM_ARRAY_JOB_ID")
     args.SLURM_ARRAY_TASK_ID = os.getenv("SLURM_ARRAY_TASK_ID")
@@ -68,7 +70,7 @@ def main(args):
         )
 
     ###########################################################################
-    # Create the output dir
+    # 创建输出目录
     ###########################################################################
     print(f"Output dir for this run: {args.output_dir}")
     # notify if exists
@@ -80,32 +82,69 @@ def main(args):
         os.makedirs(args.output_dir)
 
     ###########################################################################
-    # Load the dataset
+    # 加载数据集
     ###########################################################################
     # basic ops like shuffling and select are done in load fn
     dataset = load_hf_dataset(args)
 
     ###########################################################################
-    # Instantiate model and tokenizer
+    # 加载模型和分词器
     ###########################################################################
 
     model, tokenizer, device = load_model(args)
+    # from transformers import AutoTokenizer, AutoModelForCausalLM
 
+    # tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    # model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    
+    # args.is_decoder_only_model = True
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    # if args.load_fp16:
+    #     pass
+    # else:
+    #     model = model.to(device)
+    # model.eval()
+
+    # if args.is_decoder_only_model:
+    #     padding_side = "left"
+    # else:
+    #     raise NotImplementedError(
+    #         "Need to check how to handle padding for seq2seq models when calling generate"
+    #     )
+
+    # if True:
+    #     tokenizer = LlamaTokenizer.from_pretrained(
+    #         args.model_name_or_path, padding_side=padding_side
+    #     )
+    #     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
+    #     model.config.bos_token_id = 1
+    #     model.config.eos_token_id = 2
+    # else:
+    #     tokenizer = AutoTokenizer.from_pretrained(
+    #         args.model_name_or_path, padding_side=padding_side
+    #     )
+
+    # args.model_max_length = model.config.max_position_embeddings
     ###########################################################################
-    # Configure the prompt construction partial
+    # 设置和prompt有关的参数列表
     ###########################################################################
 
     # Construct the data filtering/sampling scheme partials
+    # 首先创建了一个基础的参数字典 token_kwargs
     token_kwargs = dict(
         hf_model_name=args.model_name_or_path,
         tokenizer=tokenizer,
         args=args,
     )
+    # 然后根据不同的输入截断策略(input_truncation_strategy)向token_kwargs添加不同的参数:
     if args.input_truncation_strategy == "prompt_length":
+        # # 添加最小提示词token数量参数
         token_kwargs.update(dict(min_prompt_tokens=args.min_prompt_tokens))
     elif args.input_truncation_strategy == "completion_length":
+        #  # 添加最大新生成token数量参数
         token_kwargs.update(dict(max_new_tokens=args.max_new_tokens))
     elif args.input_truncation_strategy == "no_truncation":
+        #  # 确保不截断输入
         # truncate_input_for_prompt is a bool flag, that is set by
         # the dataset loading function, semi-redundant, to make sure
         # people are very aware of which input data style they are using
@@ -548,13 +587,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--wandb_project",
         type=str,
-        default="lm-watermarking",
+        default="KWG",
         help="The name of the wandb project.",
     )
     parser.add_argument(
         "--wandb_entity",
         type=str,
-        default="jwkirchenbauer",
+        default="hming",
         help="The wandb entity/user for the project.",
     )
     parser.add_argument(

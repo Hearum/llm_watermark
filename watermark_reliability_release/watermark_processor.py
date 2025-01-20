@@ -19,14 +19,31 @@ import collections
 from math import sqrt
 from itertools import chain, tee
 from functools import lru_cache
-
+import numpy as np
 import scipy.stats
 import torch
 from tokenizers import Tokenizer
 from transformers import LogitsProcessor
+import sys
+import pdb
+# 添加新的搜索路径
+sys.path.append('/home/shenhm/doucments/lm-watermarking/watermark_reliability_release')
 
 from normalizers import normalization_strategy_lookup
 from alternative_prf_schemes import prf_lookup, seeding_scheme_lookup
+
+import numpy as np
+import hashlib
+
+def custom_hash(K, dim):
+    str_K = str(K)
+    hash_object = hashlib.sha256(str_K.encode())
+    hex_digest = hash_object.hexdigest()
+    hex_chars_to_take = dim // 4
+    if dim % 4 != 0:
+        hex_chars_to_take -= 1
+    binary_hash = bin(int(hex_digest[:hex_chars_to_take], 16))[2:].zfill(dim)
+    return np.array([int(bit) for bit in binary_hash])
 
 
 class WatermarkBase:
@@ -35,12 +52,16 @@ class WatermarkBase:
         vocab: list[int] = None,
         gamma: float = 0.5,
         delta: float = 2.0,
-        seeding_scheme: str = "simple_1",  # simple default, find more schemes in alternative_prf_schemes.py
+        # simple_1 是默认的种子方案，KWG1使用最简单的input_id-1作为哈希种子
+        # 在alternative_prf_schemes.py中可以找到更多的种子方案
+        seeding_scheme: str = "simple_1",
         select_green_tokens: bool = True,  # should always be the default if not running in legacy mode
+        #########LSH#########
+        n_hashes: int = 10,               # LSH的哈希函数数量，决定了有多少个桶
+        n_features: int = 32 ,            # 每个哈希函数的维度
+        threshold_len = 5,
     ):
         # patch now that None could now maybe be passed as seeding_scheme
-        if seeding_scheme is None:
-            seeding_scheme = "simple_1"
 
         # Vocabulary setup
         self.vocab = vocab
@@ -50,9 +71,20 @@ class WatermarkBase:
         self.gamma = gamma
         self.delta = delta
         self.rng = None
-        self._initialize_seeding_scheme(seeding_scheme)
+
         # Legacy behavior:
         self.select_green_tokens = select_green_tokens
+
+        # LSH相关初始化
+        self.threshold_len = threshold_len
+        self.n_hashes = n_hashes
+        self.n_features = n_features
+        self.projection_matrix = self._generate_random_projection()
+        self.lsh_tables = []  # 存储哈希表
+        self.token_embeddings = {}  # 存储token的嵌入向量
+        self.token_signatures = {}  # 存储token的LSH签名
+        self.index_len = 32
+        self.hash_key = 15485863
 
     def _initialize_seeding_scheme(self, seeding_scheme: str) -> None:
         """Initialize all internal settings of the seeding strategy from a colloquial, "public" name for the scheme."""
@@ -60,37 +92,135 @@ class WatermarkBase:
             seeding_scheme
         )
 
-    def _seed_rng(self, input_ids: torch.LongTensor) -> None:
+    def _generate_random_projection(self):
+        """生成一个随机投影矩阵"""
+        return np.random.randn(self.n_features, self.n_features)
+
+    def _hash_function(self, point, projection_matrix):
+        """基于随机投影生成哈希值"""
+        projected = np.dot(point, projection_matrix)
+        return np.sign(projected)  # 返回-1或1
+
+    def _get_embedding(self, token:torch.LongTensor):
+        """获取给定token的嵌入向量。"""
+        if token not in self.token_embeddings:
+            self.token_embeddings[token] = custom_hash(token,self.n_features) #np.random.randn(300)
+        return self.token_embeddings[token]
+    
+    def _add_token_signature(self, token: torch.LongTensor):
+        """将token的LSH签名保存到字典中"""
+        if token not in self.token_signatures:
+            token_embedding = self._get_embedding(token)
+            lsh_signature = np.array(self._hash_function(token_embedding, self.projection_matrix))
+            self.token_signatures[token] = lsh_signature
+        else:
+            lsh_signature = self.token_signatures[token]
+        return lsh_signature
+    
+    def get_token_sig(self, token: torch.LongTensor):
+        """将token的LSH签名保存到字典中"""
+        if token not in self.token_signatures:
+            token_embedding = self._get_embedding(token)
+            lsh_signature = tuple(self._hash_function(token_embedding, self.projection_matrix))
+            self.token_signatures[token] = lsh_signature
+        else:
+            lsh_signature = self.token_signatures[token]
+        return lsh_signature
+    
+    def generate_binary_array(self, token, K, gamma, hash_=True):
+        # 计算应该有多少个 1
+        num_ones = int(K * gamma)
+        # 生成一个长度为 K 的全 0 数组
+        binary_array = torch.zeros(K, dtype=torch.int)
+        # 用 token 来决定哪些位置是 1
+        # 使用 token 的哈希值作为种子，生成一个随机序列
+        if hash_:
+            torch.manual_seed(abs(hash(token)) % (2**32))  # 使用 token 的哈希值作为种子
+        else:
+            torch.manual_seed(token % (2**32)) 
+        # 随机选择 num_ones 个位置设为 1
+        ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
+        # 将选择的位置设置为 1
+        binary_array[ones_indices] = 1
+        return binary_array
+
+    def project_next_token(self,input_ids: torch.LongTensor, next_token: torch.LongTensor, top_k: int = 5):
+        """
+        将next_token投影到LSH的随机超平面, 并返回最相关的top_k个token。
+        :param next_token: 当前输入的next_token
+        :param top_k: 返回最相关的top_k个token
+        :return: top_k个最相关token的ID及其距离
+        """
+        # 对next_token进行哈希映射，得到LSH签名
+        next_token_lsh_signature = self._add_token_signature(next_token)
+        # 查找与next_token最相关的top_k个token
+        # 这里我们假设每个token的embedding已经存储在self.token_embeddings中
+        distances = []
+        for token in input_ids:
+            if token == next_token:
+                continue
+            embedding = self._add_token_signature(token)
+            # 计算欧几里得距离（或其他距离度量）
+            dist = np.linalg.norm(embedding - next_token_lsh_signature)
+            distances.append((token, dist))
+        # 排序并返回最相似的top_k个token
+        distances.sort(key=lambda x: x[1])
+        return distances[:top_k]
+
+    def _seed_rng(self, next_token: torch.LongTensor) -> None:
         """Seed RNG from local context. Not batched, because the generators we use (like cuda.random) are not batched."""
-        # Need to have enough context for seed generation
-        if input_ids.shape[-1] < self.context_width:
-            raise ValueError(
-                f"seeding_scheme requires at least a {self.context_width} token prefix to seed the RNG."
-            )
+        # 不支持批处理，因为我们使用的生成器(如cuda.random)不支持批处理。
+        # 如果没有指定seeding_scheme，使用实例的默认值
 
-        prf_key = prf_lookup[self.prf_type](
-            input_ids[-self.context_width :], salt_key=self.hash_key
-        )
+        # 2. 生成PRF密钥
+        # 这里的prf_lookup是一个字典，存储了各种的方法，从这里将密钥hash_key和对应要保护的上下文长度hash_key输入即可
+        prf_key = next_token* self.hash_key 
+        # 3. 设置随机种子
+        # 对prf_key取模以防止溢出(最大值为2^64-1)，随机数种子生成器有上限值
         # enable for long, interesting streams of pseudorandom numbers: print(prf_key)
-        self.rng.manual_seed(prf_key % (2**64 - 1))  # safeguard against overflow from long
+        self.rng.manual_seed(prf_key.item() % (2**64 - 1))  # safeguard against overflow from long
+        
 
-    def _get_greenlist_ids(self, input_ids: torch.LongTensor) -> torch.LongTensor:
-        """Seed rng based on local context width and use this information to generate ids on the green list."""
-        self._seed_rng(input_ids)
-
-        greenlist_size = int(self.vocab_size * self.gamma)
+    def _get_greenlist_ids(self, input_ids: torch.LongTensor, next_token:torch.LongTensor) -> torch.LongTensor:
+        """根据本地上下文宽度生成随机数种子,并使用这些信息生成绿色列表的ID。"""
+        
+        # 1. 首先根据输入的上下文设置随机数种子
+        self._seed_rng(next_token)
+        # 2. 计算绿色列表的大小
+        # gamma是一个比例系数(0-1之间),vocab_size是词表大小
+        # greenlist_size表示要选择的绿色token数量
+        # greenlist_size = int(self.vocab_size * self.gamma)
+        # 利用next_token打乱词表
         vocab_permutation = torch.randperm(
-            self.vocab_size, device=input_ids.device, generator=self.rng
-        )
-        if self.select_green_tokens:  # directly
-            greenlist_ids = vocab_permutation[:greenlist_size]  # new
-        else:  # select green via red
-            greenlist_ids = vocab_permutation[
-                (self.vocab_size - greenlist_size) :
-            ]  # legacy behavior
+            self.vocab_size, 
+            device=input_ids.device,
+            generator=self.rng)
+        
+        candidates = self.project_next_token(input_ids=input_ids,next_token=next_token,top_k=self.threshold_len)
+
+        vocab_indices = []
+        for candidate in candidates:
+           vocab_indices.append(self.generate_binary_array(candidate[1], self.index_len, self.gamma, hash_=False))
+
+        result_tensor = torch.cat(vocab_indices).to(input_ids.device)
+
+        # Cef [[1,1,0,0,0,0] [0,0,1,1,0,0] [0,0,0,0,1,1]]
+        # cdb [[1,1,0,0,0,0] [0,0,1,1,0,0] [0,0,0,1,0,1]]
+        extended_indices = result_tensor.repeat((len(vocab_permutation) // len(result_tensor)) + 1)[:len(vocab_permutation)]
+
+        pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
+
+        # 4. 选择绿色token
+        if self.select_green_tokens:  # 直接选择模式
+            # 从随机排列的开头选择greenlist_size个token作为绿色token
+            greenlist_ids = vocab_permutation[pointwise_results > 0] 
+        else:  # 通过红色token反选模式(旧的行为)
+            # 从随机排列的末尾选择greenlist_size个token作为绿色token 
+            greenlist_ids = vocab_permutation[pointwise_results <= 0] 
+        
         return greenlist_ids
 
-
+# 封装在Hunggingface logitsprocessor的水印添加类
 class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
     """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the watermark,
     but can also be used as a standalone tool inserted for any model producing scores inbetween model outputs and next token sampler.
@@ -100,10 +230,11 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         super().__init__(*args, **kwargs)
 
         self.store_spike_ents = store_spike_ents
-        self.spike_entropies = None
-        if self.store_spike_ents:
+        self.spike_entropies = None # 怎么还配置熵计算的功能
+        if self.store_spike_ents: #是否开启存储熵峰值计算功能
             self._init_spike_entropies()
 
+    # 熵值计算
     def _init_spike_entropies(self):
         alpha = torch.exp(torch.tensor(self.delta)).item()
         gamma = self.gamma
@@ -116,6 +247,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
             self.z_value = 1.0
             self.expected_gl_coef = 1.0
 
+    # 将存储在 self.spike_entropies 中的张量值提取为 Python 数值并以列表形式返回
     def _get_spike_entropies(self):
         spike_ents = [[] for _ in range(len(self.spike_entropies))]
         for b_idx, ent_tensor_list in enumerate(self.spike_entropies):
@@ -136,6 +268,8 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         sum_renormed_probs = renormed_probs.sum()
         return sum_renormed_probs
 
+    # 按batch批次，通过给定的的green_token_ids(选好的绿集id),生成红绿集合的mask掩码
+    # 我们主要修改的代码应该就是这一个部分
     def _calc_greenlist_mask(
         self, scores: torch.FloatTensor, greenlist_token_ids
     ) -> torch.BoolTensor:
@@ -146,15 +280,23 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 green_tokens_mask[b_idx][greenlist] = True
         return green_tokens_mask
 
+    # 添加水印偏置
+    # 无需修改 保持和green_list msak张量大小一致就行
     def _bias_greenlist_logits(
         self, scores: torch.Tensor, greenlist_mask: torch.Tensor, greenlist_bias: float
     ) -> torch.Tensor:
         scores[greenlist_mask] = scores[greenlist_mask] + greenlist_bias
         return scores
 
+    # 基于当前候选token生成绿色列表,必要时拒绝并继续
+    # 包含多种提前停止规则以提高效率
+    '''
+    如果候选 token 不符合条件，它会被拒绝并跳过，直到满足一定的条件。
+    '''
     def _score_rejection_sampling(
         self, input_ids: torch.LongTensor, scores: torch.FloatTensor, tail_rule="fixed_compute"
     ) -> list[int]:
+        # 这里就是自哈希的描述吧
         """Generate greenlist based on current candidate next token. Reject and move on if necessary. Method not batched.
         This is only a partial version of Alg.3 "Robust Private Watermarking", as it always assumes greedy sampling. It will still (kinda)
         work for all types of sampling, but less effectively.
@@ -164,15 +306,17 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         sorted_scores, greedy_predictions = scores.sort(dim=-1, descending=True)
 
         final_greenlist = []
+
         for idx, prediction_candidate in enumerate(greedy_predictions):
+            # 将当前还没有生成的token作为input_id的一部分一起输进去
             greenlist_ids = self._get_greenlist_ids(
-                torch.cat([input_ids, prediction_candidate[None]], dim=0)
-            )  # add candidate to prefix
+                input_ids, prediction_candidate)  
             if prediction_candidate in greenlist_ids:  # test for consistency
                 final_greenlist.append(prediction_candidate)
 
             # What follows below are optional early-stopping rules for efficiency
             if tail_rule == "fixed_score":
+                # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
                     break
             elif tail_rule == "fixed_list_length":
@@ -189,34 +333,51 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         """Call with previous context as input_ids, and scores for next token."""
 
         # this is lazy to allow us to co-locate on the watermarked model's device
-        self.rng = torch.Generator(device=input_ids.device) if self.rng is None else self.rng
+        # 初始化随机数生成器
+        if input_ids.shape[-1] >= self.threshold_len:
+            self.rng = torch.Generator(device=input_ids.device) if self.rng is None else self.rng
 
-        # NOTE, it would be nice to get rid of this batch loop, but currently,
-        # the seed and partition operations are not tensor/vectorized, thus
-        # each sequence in the batch needs to be treated separately.
+            # NOTE, it would be nice to get rid of this batch loop, but currently,
+            # the seed and partition operations are not tensor/vectorized, thus
+            # each sequence in the batch needs to be treated separately.
+            # 作者自己也觉得用循环太土了，想用矩阵的形式优化一下
 
-        list_of_greenlist_ids = [None for _ in input_ids]  # Greenlists could differ in length
-        for b_idx, input_seq in enumerate(input_ids):
-            if self.self_salt:
+            # 初始化绿集合列表，保证大小和batch大小一样大
+            list_of_greenlist_ids = [None for _ in input_ids]  # Greenlists could differ in length
+
+            # 按batch大小循环
+            # 我们主要修改的就是这一块的代码
+            for b_idx, input_seq in enumerate(input_ids):
+                # if self.self_salt:
+                #     # 两种都是词表划分方法，上面这种好像是用了自哈希的方案+提前终止采样
+                #     greenlist_ids = self._score_rejection_sampling(input_seq, scores[b_idx])
+                # else:
+                #     greenlist_ids = self._get_greenlist_ids(input_seq)
+                # # 获取当前batch_id下的绿集合词表
                 greenlist_ids = self._score_rejection_sampling(input_seq, scores[b_idx])
-            else:
-                greenlist_ids = self._get_greenlist_ids(input_seq)
-            list_of_greenlist_ids[b_idx] = greenlist_ids
+                list_of_greenlist_ids[b_idx] = greenlist_ids
 
-            # logic for computing and storing spike entropies for analysis
-            if self.store_spike_ents:
-                if self.spike_entropies is None:
-                    self.spike_entropies = [[] for _ in range(input_ids.shape[0])]
-                self.spike_entropies[b_idx].append(self._compute_spike_entropy(scores[b_idx]))
+                # 计算和存储尖峰熵
+                # 用于可视化和后续讨论用的
+                # logic for computing and storing spike entropies for analysis
+                if self.store_spike_ents:
+                    if self.spike_entropies is None:
+                        self.spike_entropies = [[] for _ in range(input_ids.shape[0])]
+                    self.spike_entropies[b_idx].append(self._compute_spike_entropy(scores[b_idx]))
 
-        green_tokens_mask = self._calc_greenlist_mask(
-            scores=scores, greenlist_token_ids=list_of_greenlist_ids
-        )
-        scores = self._bias_greenlist_logits(
-            scores=scores, greenlist_mask=green_tokens_mask, greenlist_bias=self.delta
-        )
+            # 计算绿色标记掩码（Greenlist Mask）
+            # 修改后就不需要调用这一块了
+            green_tokens_mask = self._calc_greenlist_mask(
+                scores=scores, greenlist_token_ids=list_of_greenlist_ids
+            )
+
+            # 将水印偏置添加到原有的socre上面去
+            scores = self._bias_greenlist_logits(
+                scores=scores, greenlist_mask=green_tokens_mask, greenlist_bias=self.delta
+            )
 
         return scores
+
 
 
 class WatermarkDetector(WatermarkBase):

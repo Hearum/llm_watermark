@@ -204,17 +204,19 @@ def generate(prompt, args, model=None, device=None, tokenizer=None):
     """Instatiate the WatermarkLogitsProcessor according to the watermark parameters
        and generate watermarked text by passing it to the generate method of the model
        as a logits processor. """
-    
+    # 根据水印参数实例化WatermarkLogitsProcessor, 并通过将其传递给模型的generate方法作为logits处理器来生成带有水印的文本。
+
     print(f"Generating with {args}")
 
+    # 加载进来水印处理类
     watermark_processor = WatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
                                                     gamma=args.gamma,
                                                     delta=args.delta,
                                                     seeding_scheme=args.seeding_scheme,
                                                     select_green_tokens=args.select_green_tokens)
 
+    # 生成参数设置
     gen_kwargs = dict(max_new_tokens=args.max_new_tokens)
-
     if args.use_sampling:
         gen_kwargs.update(dict(
             do_sample=True, 
@@ -226,15 +228,20 @@ def generate(prompt, args, model=None, device=None, tokenizer=None):
             num_beams=args.n_beams
         ))
 
-    generate_without_watermark = partial(
+    # 创造生成函数的偏函数
+    # 生成不带水印的文本，使用默认的生成参数。
+    generate_without_watermark = partial( 
         model.generate,
         **gen_kwargs
     )
+    # 生成带有水印的文本，额外传入logits_processor，以调整词汇概率分布。
     generate_with_watermark = partial(
         model.generate,
         logits_processor=LogitsProcessorList([watermark_processor]), 
         **gen_kwargs
     )
+
+    # 处理提示文本的最大长度，如果用户指定了prompt_max_length，则使用该值。否则，尝试从模型配置中获取max_position_embedding，并减去max_new_tokens。
     if args.prompt_max_length:
         pass
     elif hasattr(model.config,"max_position_embedding"):
@@ -242,23 +249,29 @@ def generate(prompt, args, model=None, device=None, tokenizer=None):
     else:
         args.prompt_max_length = 2048-args.max_new_tokens
 
+    # tokenizer
+    # 将截断后的输入token重新解码为文本，存储在redecoded_input中，便于后续显示或处理。
     tokd_input = tokenizer(prompt, return_tensors="pt", add_special_tokens=True, truncation=True, max_length=args.prompt_max_length).to(device)
     truncation_warning = True if tokd_input["input_ids"].shape[-1] == args.prompt_max_length else False
     redecoded_input = tokenizer.batch_decode(tokd_input["input_ids"], skip_special_tokens=True)[0]
 
+    # 设置随机种子并生成不带水印的文本
     torch.manual_seed(args.generation_seed)
     output_without_watermark = generate_without_watermark(**tokd_input)
 
     # optional to seed before second generation, but will not be the same again generally, unless delta==0.0, no-op watermark
+    # 如果用户选择分开种子，则再次设置随机种子，并生成带有水印的文本·
     if args.seed_separately: 
         torch.manual_seed(args.generation_seed)
     output_with_watermark = generate_with_watermark(**tokd_input)
 
+    # 如果模型是decoder-only模型，则需要隔离新生成的水印文本
     if args.is_decoder_only_model:
         # need to isolate the newly generated tokens
         output_without_watermark = output_without_watermark[:,tokd_input["input_ids"].shape[-1]:]
         output_with_watermark = output_with_watermark[:,tokd_input["input_ids"].shape[-1]:]
-
+        
+    # 将生成的水印文本解码为文本
     decoded_output_without_watermark = tokenizer.batch_decode(output_without_watermark, skip_special_tokens=True)[0]
     decoded_output_with_watermark = tokenizer.batch_decode(output_with_watermark, skip_special_tokens=True)[0]
 
