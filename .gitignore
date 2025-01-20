@@ -130,4 +130,6 @@ dmypy.json
 watermark_reliability_release/dataset/
 watermark_reliability_release/output/
 watermark_reliability_release/figure_notebooks/
-watermark_reliability_release/wandb
+watermark_reliability_release/wandb/
+watermark_reliability_release/metrics/
+./.git
