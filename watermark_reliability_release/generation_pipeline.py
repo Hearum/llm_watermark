@@ -25,7 +25,7 @@ print(f"Current huggingface cache dir: {os.environ['HF_HOME']}")
 
 # HF classses
 from transformers import LogitsProcessorList, DataCollatorWithPadding
-
+import torch
 # better bool flag type for argparse
 from utils.submitit import str2bool
 
@@ -92,7 +92,39 @@ def main(args):
     ###########################################################################
 
     model, tokenizer, device = load_model(args)
+    # from transformers import AutoTokenizer, AutoModelForCausalLM
 
+    # tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    # model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    
+    # args.is_decoder_only_model = True
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    # if args.load_fp16:
+    #     pass
+    # else:
+    #     model = model.to(device)
+    # model.eval()
+
+    # if args.is_decoder_only_model:
+    #     padding_side = "left"
+    # else:
+    #     raise NotImplementedError(
+    #         "Need to check how to handle padding for seq2seq models when calling generate"
+    #     )
+
+    # if True:
+    #     tokenizer = LlamaTokenizer.from_pretrained(
+    #         args.model_name_or_path, padding_side=padding_side
+    #     )
+    #     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
+    #     model.config.bos_token_id = 1
+    #     model.config.eos_token_id = 2
+    # else:
+    #     tokenizer = AutoTokenizer.from_pretrained(
+    #         args.model_name_or_path, padding_side=padding_side
+    #     )
+
+    # args.model_max_length = model.config.max_position_embeddings
     ###########################################################################
     # 设置和prompt有关的参数列表
     ###########################################################################
@@ -555,13 +587,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--wandb_project",
         type=str,
-        default="lm-watermarking",
+        default="KWG",
         help="The name of the wandb project.",
     )
     parser.add_argument(
         "--wandb_entity",
         type=str,
-        default="jwkirchenbauer",
+        default="hming",
         help="The wandb entity/user for the project.",
     )
     parser.add_argument(
