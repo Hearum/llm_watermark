@@ -2,7 +2,8 @@
 
 # requires some OUTPUT_DIR to be set in the environment
 # as well as a path to the hf format LLAMA model
-
+cd /home/shenhm/documents/lm-watermarking/watermark_reliability_release
+export HF_HOME= ~/.cache/huggingface
 RUN_NAME=llama_N500_T200
 
 GENERATION_OUTPUT_DIR="$OUTPUT_DIR"/"$RUN_NAME"

@@ -54,9 +54,16 @@ class WatermarkBase:
     def _seed_rng(self, input_ids: torch.LongTensor, seeding_scheme: str = None) -> None:
         # can optionally override the seeding scheme,
         # but uses the instance attr by default
+        """
+        设置随机种子。
+        输入：
+        - input_ids: 包含输入token的tensor，形状为(batch_size, sequence_length)。
+        - seeding_scheme: 可选的种子方案，默认为None。
+        """
         if seeding_scheme is None:
             seeding_scheme = self.seeding_scheme
 
+        # 最简答的KWG方案，使用输入序列的最后一个token作为种子
         if seeding_scheme == "simple_1":
             assert input_ids.shape[-1] >= 1, f"seeding_scheme={seeding_scheme} requires at least a 1 token prefix sequence to seed rng"
             prev_token = input_ids[-1].item()
@@ -64,39 +71,83 @@ class WatermarkBase:
         else:
             raise NotImplementedError(f"Unexpected seeding_scheme: {seeding_scheme}")
         return
-
+    
     def _get_greenlist_ids(self, input_ids: torch.LongTensor) -> list[int]:
+        """
+        获取绿色列表的ID。
+        输入：
+        - input_ids: 包含输入token的tensor，形状为(batch_size, sequence_length)。
+        输出：
+        - greenlist_ids: 绿色列表中的token ID，形状为(batch_size, greenlist_size)。
+        """
         # seed the rng using the previous tokens/prefix
         # according to the seeding_scheme
-        self._seed_rng(input_ids)
 
+        # 设置随机种子
+        self._seed_rng(input_ids)
+        # 计算绿色列表的大小
         greenlist_size = int(self.vocab_size * self.gamma)
+        # 生成一个随机排列的vocab_size大小的tensor
         vocab_permutation = torch.randperm(self.vocab_size, device=input_ids.device, generator=self.rng)
+        
+        # 如果select_green_tokens为True，则直接选择前greenlist_size个token
         if self.select_green_tokens:  # directly
             greenlist_ids = vocab_permutation[:greenlist_size]  # new
         else:  # select green via red
+            # 否则选择后greenlist_size个token，返回一个红集列表
             greenlist_ids = vocab_permutation[(self.vocab_size - greenlist_size) :]  # legacy behavior
         return greenlist_ids
 
 
 class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
+    """
+    水印处理类，继承自WatermarkBase和LogitsProcessor。实现了水印的生成和检测功能。
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def _calc_greenlist_mask(self, scores: torch.FloatTensor, greenlist_token_ids) -> torch.BoolTensor:
         # TODO lets see if we can lose this loop
+        """
+        计算绿色列表的掩码，用于标记绿色列表中的token。
+        输入：
+        - scores: 包含logits的tensor，形状为(batch_size, vocab_size)。
+        - greenlist_token_ids: 绿色列表中的token ID，形状为(batch_size, greenlist_size)。
+        输出：
+        - final_mask: 包含绿色列表掩码的tensor，形状为(batch_size, vocab_size)。
+        """
+        # 初始化绿色列表掩码，形状与scores相同，全为0
         green_tokens_mask = torch.zeros_like(scores)
+        # 按Batch维度遍历
         for b_idx in range(len(greenlist_token_ids)):
+            # 对应绿集合ID的位置设置为1，标识采用
             green_tokens_mask[b_idx][greenlist_token_ids[b_idx]] = 1
+        # 将绿色列表掩码转换为布尔类型
         final_mask = green_tokens_mask.bool()
         return final_mask
 
     def _bias_greenlist_logits(self, scores: torch.Tensor, greenlist_mask: torch.Tensor, greenlist_bias: float) -> torch.Tensor:
+        """
+        对绿色列表中的token进行偏置，增加其logits值。
+        输入：
+        - scores: 包含logits的tensor，形状为(batch_size, vocab_size)。
+        - greenlist_mask: 包含绿色列表掩码的tensor，形状为(batch_size, vocab_size)。
+        - greenlist_bias: 绿色列表的偏置值。
+        输出：
+        - 偏置后的scores: 包含偏置后的logits的tensor，形状为(batch_size, vocab_size)。
+        """
         scores[greenlist_mask] = scores[greenlist_mask] + greenlist_bias
         return scores
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
-
+        """
+        对输入的token和logits进行水印处理。
+        输入：
+        - input_ids: 包含输入token的tensor，形状为(batch_size, sequence_length)。
+        - scores: 包含logits的tensor，形状为(batch_size, vocab_size)。
+        输出：
+        - 偏置后的scores: 包含偏置后的logits的tensor，形状为(batch_size, vocab_size)。
+        """
         # this is lazy to allow us to colocate on the watermarked model's device
         if self.rng is None:
             self.rng = torch.Generator(device=input_ids.device)
@@ -104,14 +155,19 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         # NOTE, it would be nice to get rid of this batch loop, but currently,
         # the seed and partition operations are not tensor/vectorized, thus
         # each sequence in the batch needs to be treated separately.
-        batched_greenlist_ids = [None for _ in range(input_ids.shape[0])]
 
+        # 初始化一个列表，用于存储每个batch的绿色列表ID
+        batched_greenlist_ids = [None for _ in range(input_ids.shape[0])]
+        # 按Batch维度遍历
         for b_idx in range(input_ids.shape[0]):
+            # 这里和KWG1不一样，输入整个序列到函数get_greenlist_ids中
             greenlist_ids = self._get_greenlist_ids(input_ids[b_idx])
+            # 将绿色列表ID存储在batched_greenlist_ids列表中
             batched_greenlist_ids[b_idx] = greenlist_ids
 
+        # 计算绿色列表掩码
         green_tokens_mask = self._calc_greenlist_mask(scores=scores, greenlist_token_ids=batched_greenlist_ids)
-
+        # 对绿色列表中的token进行偏置
         scores = self._bias_greenlist_logits(scores=scores, greenlist_mask=green_tokens_mask, greenlist_bias=self.delta)
         return scores
 
