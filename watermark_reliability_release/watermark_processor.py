@@ -35,6 +35,29 @@ from alternative_prf_schemes import prf_lookup, seeding_scheme_lookup
 import numpy as np
 import hashlib
 
+# Generate a global permute table once at startup
+rng = torch.Generator(device=torch.device("cpu"))
+rng.manual_seed(2971215073)  # fib47 is prime
+# 2^ 20=1048576
+table_size = 1_000_003
+fixed_table = torch.randperm(
+    1_000_003, device=torch.device("cpu"), generator=rng
+)  # actually faster than I thought
+
+# 用于将输入的整数张量转换为另一个整数张量，类似于哈希操作（本质上就是最简单的一种哈希，设置一个足够大的table_size然后取模)
+# 利用一个预定义的固定查找表（fixed_table）对输入进行映射，从而实现一种简单且高效的哈希功能。
+def hashint_to_bin(integer_tensor: torch.LongTensor) -> torch.Tensor:
+    """将整数张量映射为 32 位二进制比特串"""
+    # 计算哈希值
+    hash_value = fixed_table[integer_tensor.cpu() % table_size] + 1  # 保证值大于 0
+    
+    # 将哈希值转换为 32 位的二进制字符串
+    # 使用 format 将整数转换为 32 位二进制格式，确保长度为 32 位
+    binary_str = [format(val.item(), '032b') for val in hash_value]
+
+    # 返回一个字符串的张量，表示 32 位的二进制比特串
+    return torch.tensor([[int(bit) for bit in bin_str] for bin_str in binary_str], device=integer_tensor.device)
+
 def custom_hash(K, dim):
     str_K = str(K)
     hash_object = hashlib.sha256(str_K.encode())
@@ -57,7 +80,7 @@ class WatermarkBase:
         seeding_scheme: str = "simple_1",
         select_green_tokens: bool = True,  # should always be the default if not running in legacy mode
         #########LSH#########
-        n_hashes: int = 10,               # LSH的哈希函数数量，决定了有多少个桶
+        n_hashes: int = 5,               # LSH的哈希函数数量，决定了有多少个桶
         n_features: int = 32 ,            # 每个哈希函数的维度
         threshold_len = 5,
     ):
@@ -85,100 +108,106 @@ class WatermarkBase:
         self.token_signatures = {}  # 存储token的LSH签名
         self.index_len = 32
         self.hash_key = 15485863
+        self.hash_table_ins = self.generate_hash_table_binary_array()
 
+    # def precompute_token_hashes(self):
+    #     """预计算整个词表中所有 token 的哈希值并保存在 self.token_embeddings 中。"""
+    #     # 遍历词表中的所有 token，并计算其哈希值
+    #     for token in self.vocab:
+    #         if token not in self.token_embeddings:
+    #             # 计算并缓存每个 token 的哈希值
+    #         self.token_embeddings[token] = custom_hash(token, self.n_features)
+            
     def _initialize_seeding_scheme(self, seeding_scheme: str) -> None:
         """Initialize all internal settings of the seeding strategy from a colloquial, "public" name for the scheme."""
         self.prf_type, self.context_width, self.self_salt, self.hash_key = seeding_scheme_lookup(
             seeding_scheme
         )
 
-    def _generate_random_projection(self):
+    def _generate_random_projection(self,):
         """生成一个随机投影矩阵"""
-        return np.random.randn(self.n_features, self.n_features)
+        # 使用 torch 来生成标准正态分布的随机矩阵
+        return torch.randn(self.n_features, self.n_features, generator=rng)
 
     def _hash_function(self, point, projection_matrix):
         """基于随机投影生成哈希值"""
-        projected = np.dot(point, projection_matrix)
-        return np.sign(projected)  # 返回-1或1
+        # point 1,32 10,32
+        projected = torch.matmul(point.float(), projection_matrix.to(point.device))
+        return torch.ge(projected, 0).int()  # 返回-1或1
 
-    def _get_embedding(self, token:torch.LongTensor):
-        """获取给定token的嵌入向量。"""
-        if token not in self.token_embeddings:
-            self.token_embeddings[token] = custom_hash(token,self.n_features) #np.random.randn(300)
-        return self.token_embeddings[token]
+    # def _get_embedding(self, token:torch.LongTensor):
+    #     """获取给定token的嵌入向量。"""
+    #     if token not in self.token_embeddings:
+    #         self.token_embeddings[token] = custom_hash(token,self.n_features) #np.random.randn(300)
+    #     return self.token_embeddings[token]
     
-    def _add_token_signature(self, token: torch.LongTensor):
-        """将token的LSH签名保存到字典中"""
-        if token not in self.token_signatures:
-            token_embedding = self._get_embedding(token)
-            lsh_signature = np.array(self._hash_function(token_embedding, self.projection_matrix))
-            self.token_signatures[token] = lsh_signature
-        else:
-            lsh_signature = self.token_signatures[token]
-        return lsh_signature
+    # def _add_token_signature(self, token: torch.LongTensor):
+    #     """将token的LSH签名保存到字典中"""
+    #     if token not in self.token_signatures:
+    #         token_embedding = self._get_embedding(token)
+    #         lsh_signature = np.array(self._hash_function(token_embedding, self.projection_matrix))
+    #         self.token_signatures[token] = lsh_signature
+    #     else:
+    #         lsh_signature = self.token_signatures[token]
+    #     return lsh_signature
     
-    def get_token_sig(self, token: torch.LongTensor):
-        """将token的LSH签名保存到字典中"""
-        if token not in self.token_signatures:
-            token_embedding = self._get_embedding(token)
-            lsh_signature = tuple(self._hash_function(token_embedding, self.projection_matrix))
-            self.token_signatures[token] = lsh_signature
-        else:
-            lsh_signature = self.token_signatures[token]
-        return lsh_signature
+    # def get_token_sig(self, token: torch.LongTensor):
+    #     """将token的LSH签名保存到字典中"""
+    #     if token not in self.token_signatures:
+    #         token_embedding = self._get_embedding(token)
+    #         lsh_signature = tuple(self._hash_function(token_embedding, self.projection_matrix))
+    #         self.token_signatures[token] = lsh_signature
+    #     else:
+    #         lsh_signature = self.token_signatures[token]
+    #     return lsh_signature
     
-    def generate_binary_array(self, token, K, gamma, hash_=True):
+    def generate_hash_table_binary_array(self):
         # 计算应该有多少个 1
-        num_ones = int(K * gamma)
+        K = self.vocab_size // (2 ** self.n_hashes) 
+        num_ones = int(K * self.gamma)
         # 生成一个长度为 K 的全 0 数组
-        binary_array = torch.zeros(K, dtype=torch.int)
-        # 用 token 来决定哪些位置是 1
-        # 使用 token 的哈希值作为种子，生成一个随机序列
-        if hash_:
-            torch.manual_seed(abs(hash(token)) % (2**32))  # 使用 token 的哈希值作为种子
-        else:
-            torch.manual_seed(token % (2**32)) 
-        # 随机选择 num_ones 个位置设为 1
-        ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
-        # 将选择的位置设置为 1
-        binary_array[ones_indices] = 1
-        return binary_array
+        hash_table_ins = {}
+        for hash_table_id in range(2**self.n_hashes):
+            binary_array = torch.zeros(K, dtype=torch.int)
+            reserse_binary_array  = torch.zeros(K, dtype=torch.int)
+            torch.manual_seed(hash_table_id) 
+            # 随机选择 num_ones 个位置设为 1
+            ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
+            res_ones_indices = torch.randperm(K)[-num_ones:] 
+            # 将选择的位置设置为 1
+            binary_array[ones_indices] = 1
+            reserse_binary_array[res_ones_indices] = 1
+            hash_table_ins[hash_table_id] = {"binary_array":binary_array,"reserse_binary_array":reserse_binary_array}
 
-    def project_next_token(self,input_ids: torch.LongTensor, next_token: torch.LongTensor, top_k: int = 5):
-        """
-        将next_token投影到LSH的随机超平面, 并返回最相关的top_k个token。
-        :param next_token: 当前输入的next_token
-        :param top_k: 返回最相关的top_k个token
-        :return: top_k个最相关token的ID及其距离
-        """
-        # 对next_token进行哈希映射，得到LSH签名
-        next_token_lsh_signature = self._add_token_signature(next_token)
-        # 查找与next_token最相关的top_k个token
-        # 这里我们假设每个token的embedding已经存储在self.token_embeddings中
-        distances = []
-        for token in input_ids:
-            if token == next_token:
-                continue
-            embedding = self._add_token_signature(token)
-            # 计算欧几里得距离（或其他距离度量）
-            dist = np.linalg.norm(embedding - next_token_lsh_signature)
-            distances.append((token, dist))
-        # 排序并返回最相似的top_k个token
-        distances.sort(key=lambda x: x[1])
-        return distances[:top_k]
+        return hash_table_ins
+    
+
+    def proj_LSH_Space(self,input_ids: torch.LongTensor,):
+        all_signatures = set()
+        embed_ids = hashint_to_bin(input_ids) 
+        for embed_id in embed_ids:
+            signature = self._hash_function(embed_id, self.projection_matrix)
+            all_signatures.add(signature)
+        indices = []
+        for hash_table_id in range(2**self.n_hashes):
+            if hash_table_id in all_signatures:
+                indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
+            else:
+                indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
+
+        extended_indices = torch.cat(indices)
+        if extended_indices.size(0) > self.vocab_size:
+            extended_indices = extended_indices[:self.vocab_size]
+        elif extended_indices.size(0) < self.vocab_size:
+            padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
+            extended_indices = torch.cat([extended_indices, padding])
+        return extended_indices.to(input_ids.device)
+
 
     def _seed_rng(self, next_token: torch.LongTensor) -> None:
         """Seed RNG from local context. Not batched, because the generators we use (like cuda.random) are not batched."""
-        # 不支持批处理，因为我们使用的生成器(如cuda.random)不支持批处理。
-        # 如果没有指定seeding_scheme，使用实例的默认值
-
-        # 2. 生成PRF密钥
-        # 这里的prf_lookup是一个字典，存储了各种的方法，从这里将密钥hash_key和对应要保护的上下文长度hash_key输入即可
         prf_key = next_token* self.hash_key 
-        # 3. 设置随机种子
-        # 对prf_key取模以防止溢出(最大值为2^64-1)，随机数种子生成器有上限值
-        # enable for long, interesting streams of pseudorandom numbers: print(prf_key)
-        self.rng.manual_seed(prf_key.item() % (2**64 - 1))  # safeguard against overflow from long
+        self.rng.manual_seed(prf_key.item() % (2**64 - 1)) 
         
 
     def _get_greenlist_ids(self, input_ids: torch.LongTensor, next_token:torch.LongTensor) -> torch.LongTensor:
@@ -186,41 +215,22 @@ class WatermarkBase:
         
         # 1. 首先根据输入的上下文设置随机数种子
         self._seed_rng(next_token)
-        # 2. 计算绿色列表的大小
-        # gamma是一个比例系数(0-1之间),vocab_size是词表大小
-        # greenlist_size表示要选择的绿色token数量
-        # greenlist_size = int(self.vocab_size * self.gamma)
-        # 利用next_token打乱词表
+
         vocab_permutation = torch.randperm(
             self.vocab_size, 
             device=input_ids.device,
             generator=self.rng)
         
-        candidates = self.project_next_token(input_ids=input_ids,next_token=next_token,top_k=self.threshold_len)
-
-        vocab_indices = []
-        for candidate in candidates:
-           vocab_indices.append(self.generate_binary_array(candidate[1], self.index_len, self.gamma, hash_=False))
-
-        result_tensor = torch.cat(vocab_indices).to(input_ids.device)
-
-        # Cef [[1,1,0,0,0,0] [0,0,1,1,0,0] [0,0,0,0,1,1]]
-        # cdb [[1,1,0,0,0,0] [0,0,1,1,0,0] [0,0,0,1,0,1]]
-        extended_indices = result_tensor.repeat((len(vocab_permutation) // len(result_tensor)) + 1)[:len(vocab_permutation)]
-
+        extended_indices = self.proj_LSH_Space(input_ids=input_ids)
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
-
-        # 4. 选择绿色token
-        if self.select_green_tokens:  # 直接选择模式
-            # 从随机排列的开头选择greenlist_size个token作为绿色token
-            greenlist_ids = vocab_permutation[pointwise_results > 0] 
-        else:  # 通过红色token反选模式(旧的行为)
-            # 从随机排列的末尾选择greenlist_size个token作为绿色token 
-            greenlist_ids = vocab_permutation[pointwise_results <= 0] 
         
+        # 4. 选择绿色token
+        if self.select_green_tokens:  # 直接选择
+            greenlist_ids = vocab_permutation[pointwise_results > 0] 
+        else:  # 通过红色token反选模式
+            greenlist_ids = vocab_permutation[pointwise_results <= 0] 
         return greenlist_ids
 
-# 封装在Hunggingface logitsprocessor的水印添加类
 class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
     """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the watermark,
     but can also be used as a standalone tool inserted for any model producing scores inbetween model outputs and next token sampler.
@@ -364,6 +374,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                     if self.spike_entropies is None:
                         self.spike_entropies = [[] for _ in range(input_ids.shape[0])]
                     self.spike_entropies[b_idx].append(self._compute_spike_entropy(scores[b_idx]))
+
 
             # 计算绿色标记掩码（Greenlist Mask）
             # 修改后就不需要调用这一块了

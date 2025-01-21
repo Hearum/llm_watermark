@@ -258,6 +258,7 @@ def check_output_lengths(example, min_output_len=0):
             w_wm_output_len >= min_output_len,
         ]
     )
+    print(conds)
     return conds
 
 

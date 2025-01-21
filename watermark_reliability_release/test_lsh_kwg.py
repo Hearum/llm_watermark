@@ -3,7 +3,7 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer, LogitsProcessorList
 from functools import partial
 from dataclasses import dataclass
 from lsh_kwg import WatermarkLogitsProcessor  # 假设已经正确导入
-
+# python -m cProfile -o output.prof /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_lsh_kwg.py
 # 定义参数类用于配置
 @dataclass
 class Args:

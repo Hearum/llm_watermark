@@ -2,16 +2,17 @@
 
 # requires some OUTPUT_DIR to be set in the environment
 # as well as a path to the hf format LLAMA model
-cd /home/shenhm/doucuments/lm-watermarking/watermark_reliability_release
+cd /home/shenhm/documents/lm-watermarking/watermark_reliability_release
 export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_release/dataset
 export HF_ENDPOINT=https://hf-mirror.com
 
 OUTPUT_DIR=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_release/output
-RUN_NAME=llama_N500_T200
+RUN_NAME=llama_N500_T200_no_filter_batch_32_delta_1.5_gamma_0.25
 GENERATION_OUTPUT_DIR="$OUTPUT_DIR"/"$RUN_NAME"
 
 echo "Running generation pipeline with output dir: $GENERATION_OUTPUT_DIR"
-export CUDA_VISIBLE_DEVICES=0,5,7,8,9
+
+export CUDA_VISIBLE_DEVICES=1
 python generation_pipeline.py \
     --model_name=$LLAMA_PATH \
     --dataset_name=wikitext \
@@ -24,12 +25,14 @@ python generation_pipeline.py \
     --output_filtering_strategy=max_new_tokens \
     --seeding_scheme=selfhash \
     --gamma=0.25 \
-    --delta=2.0 \
+    --delta=0.5 \
     --run_name="$RUN_NAME"_gen \
     --wandb=True \
     --verbose=True \
     --output_dir=$GENERATION_OUTPUT_DIR \
     --model_name_or_path "/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9" \
+    --generation_batch_size 32
+
 # --attack_method=gpt \
 # python attack_pipeline.py \
 #     --attack_method=dipper \
