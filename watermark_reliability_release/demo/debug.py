@@ -1,20 +1,41 @@
 import torch
 import time
 import torch
+from transformers import AutoTokenizer
 
-# 假设 vocab_indices 和 pointwise_results 都是 torch 张量
-vocab_indices = torch.tensor([1, 2, 3, 4, 5, 6])
-pointwise_results = torch.tensor([0, 1, -1, 3, 0, 2])
+# 使用你模型对应的 tokenizer
+tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
 
-# 第一步：筛选出 pointwise_results > 0 的元素
-green_candidates = vocab_indices[pointwise_results > 0]
+# 假设你有一个 ID 序列
+ids = [  822,  1243,   363,   445,   775, 26163, 20986, 27453, 24258, 28225,
+         30341, 29021, 16686,  5361, 15470, 20124, 19641, 24885,  6255, 23035,
+         30319, 26522, 13302,  8218,  9139, 17985, 10641, 25298,  6539, 28294,
+          5743, 30745, 14468,  6684, 11705,  7930, 30387, 15739, 29243,  1945,
+         13809, 16187,  6352,  9687, 28894,  7813,  6061, 12705, 17097, 11227,
+         10143, 18259,  3895, 26608, 23386,  9834]
 
-# 第二步：获取 green_candidates 中大于 0 的位置
-greater_than_zero_positions = (green_candidates > 0).nonzero(as_tuple=True)[0]
+# 将 ID 转为对应的 Token
+tokens = tokenizer.convert_ids_to_tokens(ids)
 
-# 打印结果
-print("green_candidates:", green_candidates)
-print("Positions in green_candidates greater than 0:", greater_than_zero_positions)
+# 打印每个 ID 和对应的 Token
+print("Token IDs 和对应的 Tokens:")
+for token_id, token in zip(ids, tokens):
+    print(f"ID: {token_id} -> Token: '{token}'")
+
+
+# # 假设 vocab_indices 和 pointwise_results 都是 torch 张量
+# vocab_indices = torch.tensor([1, 2, 3, 4, 5, 6])
+# pointwise_results = torch.tensor([0, 1, -1, 3, 0, 2])
+
+# # 第一步：筛选出 pointwise_results > 0 的元素
+# green_candidates = vocab_indices[pointwise_results > 0]
+
+# # 第二步：获取 green_candidates 中大于 0 的位置
+# greater_than_zero_positions = (green_candidates > 0).nonzero(as_tuple=True)[0]
+
+# # 打印结果
+# print("green_candidates:", green_candidates)
+# print("Positions in green_candidates greater than 0:", greater_than_zero_positions)
 
 # def generate_binary_array(token, K, gamma):
 #     # 计算应该有多少个 1

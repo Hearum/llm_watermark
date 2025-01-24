@@ -1,18 +1,3 @@
-# coding=utf-8
-# Copyright 2023 Authors of "A Watermark for Large Language Models"
-# available at https://arxiv.org/abs/2301.10226
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 from __future__ import annotations
 import collections
@@ -298,6 +283,8 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 final_greenlist.append(prediction_candidate)
             # What follows below are optional early-stopping rules for efficiency
             if tail_rule == "fixed_score":
+                if len(final_greenlist) == 10:
+                    break
                 # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
                     if len(final_greenlist)< 1 :
@@ -317,8 +304,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         """Call with previous context as input_ids, and scores for next token."""
 
-        # this is lazy to allow us to co-locate on the watermarked model's device
-        # 初始化随机数生成器
+        
         if input_ids.shape[-1] >= self.threshold_len:
             self.rng = torch.Generator(device=input_ids.device) if self.rng is None else self.rng
 
@@ -352,6 +338,12 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 scores=scores, greenlist_mask=green_tokens_mask, greenlist_bias=self.delta
             )
 
+            debug = True
+            if  debug:
+            # pdb.set_trace()
+                sorted_scores, greedy_predictions = scores.sort(dim=-1, descending=True)
+                check = greedy_predictions[0][0] in greenlist_ids
+            return scores, check
 
         return scores
 
@@ -672,6 +664,10 @@ class WatermarkDetector(WatermarkBase):
         # HF-style output dictionary
         # 更新字典内容
         print(green_token_mask)
+        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
+        print(pos)
+        print("detector inputids",input_ids)
+
         score_dict = dict()
         if return_num_tokens_scored:
             score_dict.update(dict(num_tokens_scored=num_tokens_scored))
@@ -715,12 +711,12 @@ class WatermarkDetector(WatermarkBase):
         convert_to_float: bool = False,
         **kwargs,
     ) -> dict:
-        print(self.projection_matrix)
         """Scores a given string of text and returns a dictionary of results."""
 
         assert (text is not None) ^ (
             tokenized_text is not None
         ), "Must pass either the raw or tokenized string"
+
         if return_prediction:
             kwargs[
                 "return_p_value"
@@ -729,6 +725,7 @@ class WatermarkDetector(WatermarkBase):
         # run optional normalizers on text
         for normalizer in self.normalizers:
             text = normalizer(text)
+
         if len(self.normalizers) > 0:
             print(f"Text after normalization:\n\n{text}\n")
 
@@ -741,6 +738,7 @@ class WatermarkDetector(WatermarkBase):
             tokenized_text = self.tokenizer(text, return_tensors="pt", add_special_tokens=False)[
                 "input_ids"
             ][0].to(self.device)
+            
             if tokenized_text[0] == self.tokenizer.bos_token_id:
                 tokenized_text = tokenized_text[1:]
         else:
@@ -774,20 +772,6 @@ class WatermarkDetector(WatermarkBase):
         return output_dict
 
 
-
-
-
-##########################################################################
-# Ngram iteration from nltk, extracted to remove the dependency
-# Natural Language Toolkit: Utility functions
-#
-# Copyright (C) 2001-2023 NLTK Project
-# Author: Steven Bird <stevenbird1@gmail.com>
-#         Eric Kafe <kafe.eric@gmail.com> (acyclic closures)
-# URL: <https://www.nltk.org/>
-# For license information, see https://github.com/nltk/nltk/blob/develop/LICENSE.txt
-##########################################################################
-
 # 这段代码实现了生成n-grams的功能，即将输入的sequence序列划分为n个元素为一组的子序列（n-grams）。
 # 它支持对序列进行填充（pad）操作，能够在序列的两端（左端或右端）填充指定的符
 def ngrams(sequence, n, pad_left=False, pad_right=False, pad_symbol=None):
@@ -806,3 +790,130 @@ def ngrams(sequence, n, pad_left=False, pad_right=False, pad_symbol=None):
         for _ in range(i):  # iterate through every order of ngrams
             next(sub_iterable, None)  # generate the ngrams within the window.
     return zip(*iterables)  # Unpack and flattens the iterables.
+
+from functools import partial
+from dataclasses import dataclass
+import os
+import json
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from torch.nn.functional import softmax
+
+@dataclass
+class Args:
+    gamma: float = 0.25
+    delta: float = 1.5
+    seeding_scheme: str = 'default'  # 这里可以根据实际需求修改
+    select_green_tokens: bool = True
+    max_new_tokens: int = 50
+    use_sampling: bool = True
+    sampling_temp: float = 1.0
+    n_beams: int = 5
+    prompt_max_length: int = 128
+    generation_seed: int = 42
+    seed_separately: bool = False
+    is_decoder_only_model: bool = True
+
+
+def test_llm_v0():
+
+    # 指定可见的 GPU 设备
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # 初始化 Accelerator
+    args = Args(gamma=0.25, delta=2.0, max_new_tokens=100, use_sampling=False, sampling_temp=0.9, n_beams=3)
+
+    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True,device_map = "auto")
+    device =model.device
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 初始化水印处理器
+    print(f"Generating with {args}")
+    
+    # 创建 WatermarkLogitsProcessor
+    watermark_processor = WatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
+                                                    gamma=args.gamma,
+                                                    delta=args.delta,
+                                                    seeding_scheme=args.seeding_scheme,
+                                                    select_green_tokens=args.select_green_tokens)
+    
+    prompt = "def test for this code apple"
+    # 编码 prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:]
+    prefix_len = input_ids.shape[1]
+    print("prefix_len", prefix_len)
+    generated_ids = input_ids.to(device)
+
+    # 记录应用水印的位置
+    watermark_positions = []
+    max_length = 50
+
+    # 按步生成，每一步应用水印处理器
+    for _ in range(max_length):
+        with torch.no_grad():
+            # 使用模型输出的 logits
+            #logits = torch.randn((1, watermark_processor.vocab_size), device=device)
+            outputs = model(generated_ids)
+            logits = outputs.logits[:, -1, :]  # 获取最后一个 token 的 logits
+            # 应用水印偏置
+            # pdb.set_trace()
+            biased_logits, whether = watermark_processor(generated_ids, logits)
+            probs = softmax(biased_logits, dim=-1)
+
+            # 基于偏置后的 logits 采样下一个 token
+            next_token_id = torch.multinomial(probs, num_samples=1)
+            generated_ids = torch.cat((generated_ids, next_token_id.to(device)), dim=1)
+            if whether:
+                watermark_positions.append((generated_ids.size(1)-1,int(next_token_id)))
+            if next_token_id.item() == tokenizer.eos_token_id:
+                break
+    print("generated_ids",generated_ids.shape)
+    print("generated_ids",generated_ids)
+    # 解码生成的代码
+    generated_code = tokenizer.decode(generated_ids[0].to('cpu'), skip_special_tokens=True)
+    print("Generated Code:")
+    print(generated_code)
+    print("Watermark Positions:")
+    print(watermark_positions)
+
+    # 初始化 WatermarkDetector 实例
+    detector = WatermarkDetector(
+        threshold_len=0,
+        gamma=args.gamma,
+        delta=args.delta,
+        device=device,
+        tokenizer=tokenizer,
+        vocab=list(tokenizer.get_vocab().values()),
+        z_threshold=4.0,
+        normalizers=["unicode"],
+        ignore_repeated_ngrams=False,
+    )
+    
+    result = detector.detect(text=generated_code)
+    # 输出结果
+    print("raw_test_text检测结果:")
+    for key, value in result.items():
+        print(f"{key}: {value}")
+    # # 水印检测
+    # sweet_detector = SweetDetector(
+    #     vocab=list(tokenizer.get_vocab().values()),
+    #     gamma=0.25,
+    #     z_threshold=4,
+    #     entropy_threshold=1.2
+    # )
+
+    # # 转换 token 并执行检测
+    # code_tokens = tokenizer.convert_ids_to_tokens(generated_ids[0].to('cpu'))
+
+    # detection_result = sweet_detector.detect(
+    #     input_ids=generated_ids[0][prefix_len:].to('cpu'),
+    #     prompt_idx=generated_ids[0][:prefix_len].to('cpu'),
+    #     code_token=code_tokens[prefix_len:]
+    # )
+
+    # # 输出检测结果
+    # print("Detection Result:", detection_result)
+    # green_token_mask = detection_result.get('green_token_mask', [])
+
+if __name__ == '__main__':
+    test_llm_v0()

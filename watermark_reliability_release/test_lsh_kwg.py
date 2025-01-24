@@ -2,15 +2,16 @@ import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, LogitsProcessorList
 from functools import partial
 from dataclasses import dataclass
-from lsh_kwg import WatermarkLogitsProcessor  # 假设已经正确导入
+from watermark_processor import *
 # python -m cProfile -o output.prof /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_lsh_kwg.py
 # 定义参数类用于配置
+
 @dataclass
 class Args:
     gamma: float = 0.25
     delta: float = 1.5
     seeding_scheme: str = 'default'  # 这里可以根据实际需求修改
-    select_green_tokens: bool = False
+    select_green_tokens: bool = True
     max_new_tokens: int = 50
     use_sampling: bool = True
     sampling_temp: float = 1.0
@@ -34,7 +35,7 @@ def generate(prompt, args, model, device, tokenizer):
                                                     delta=args.delta,
                                                     seeding_scheme=args.seeding_scheme,
                                                     select_green_tokens=args.select_green_tokens)
-    
+
     # 生成参数设置
     gen_kwargs = dict(max_new_tokens=args.max_new_tokens)
     if args.use_sampling:
@@ -110,7 +111,7 @@ def test_watermark_generation():
     device =model.device
 
     # 配置参数
-    args = Args(gamma=0.3, delta=1.2, max_new_tokens=100, use_sampling=True, sampling_temp=0.9, n_beams=3)
+    args = Args(gamma=0.25, delta=10.0, max_new_tokens=100, use_sampling=False, sampling_temp=0.9, n_beams=3)
 
     # 设置测试文本
     prompt = "Once upon a time, in a land far away,"
