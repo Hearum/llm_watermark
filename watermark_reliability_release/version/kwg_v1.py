@@ -1,4 +1,11 @@
 
+"""
+v1版本:这个版本使用的是将水印扩展到全部上下文中，利用上下文的每一个token映射到LSH空间作为next_token的生成凭据。
+但是有一个缺点是直接删除前面的一大段会导致水印消失。替换的情况下水印强度可以。
+
+"""
+
+
 from __future__ import annotations
 import collections
 from math import sqrt
@@ -190,9 +197,6 @@ class WatermarkBase:
 
 
 class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
-    """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the watermark,
-    but can also be used as a standalone tool inserted for any model producing scores inbetween model outputs and next token sampler.
-    """
 
     def __init__(self, *args, store_spike_ents: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
@@ -265,14 +269,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         self, input_ids: torch.LongTensor, scores: torch.FloatTensor, tail_rule="fixed_score"
     ) -> list[int]:
         # 这里就是自哈希
-        """Generate greenlist based on current candidate next token. Reject and move on if necessary. Method not batched.
-        This is only a partial version of Alg.3 "Robust Private Watermarking", as it always assumes greedy sampling. It will still (kinda)
-        work for all types of sampling, but less effectively.
-        To work efficiently, this function can switch between a number of rules for handling the distribution tail.
-        These are not exposed by default.
-        """
         sorted_scores, greedy_predictions = scores.sort(dim=-1, descending=True)
-
         final_greenlist = []
 
         for idx, prediction_candidate in enumerate(greedy_predictions):
@@ -283,8 +280,8 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 final_greenlist.append(prediction_candidate)
             # What follows below are optional early-stopping rules for efficiency
             if tail_rule == "fixed_score":
-                if len(final_greenlist) == 10:
-                    break
+                # if len(final_greenlist) == 10:
+                #     break
                 # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
                     if len(final_greenlist)< 1 :
@@ -348,27 +345,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         return scores
 
 
-
 class WatermarkDetector(WatermarkBase):
-    """This is the detector for all watermarks imprinted with WatermarkLogitsProcessor.
-
-    The detector needs to be given the exact same settings that were given during text generation  to replicate the watermark
-    greenlist generation and so detect the watermark.
-    This includes the correct device that was used during text generation, the correct tokenizer, the correct
-    seeding_scheme name, and parameters (delta, gamma).
-
-    Optional arguments are
-    * normalizers ["unicode", "homoglyphs", "truecase"] -> These can mitigate modifications to generated text that could trip the watermark
-    * ignore_repeated_ngrams -> This option changes the detection rules to count every unique ngram only once.
-    * z_threshold -> Changing this threshold will change the sensitivity of the detector.
-
-    该检测器需要提供与文本生成时完全相同的设置，以便复制水印绿色列表的生成，从而检测水印。这些设置包括生成时使用的正确设备、
-    正确的分词器、正确的 seeding_scheme 名称以及相关参数 delta、gamma。
-    normalizers ["unicode", "homoglyphs", "truecase"] -> 这些可以缓解生成文本中的修改，避免干扰水印检测。
-    ignore_repeated_ngrams -> 该选项修改检测规则,只统计每个唯一的n-gram一次。
-    z_threshold -> 改变该阈值将调整检测器的敏感度。
-    """
-
     def __init__(
         self,
         *args,
@@ -663,10 +640,11 @@ class WatermarkDetector(WatermarkBase):
 
         # HF-style output dictionary
         # 更新字典内容
-        print(green_token_mask)
-        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
-        print(pos)
-        print("detector inputids",input_ids)
+        if False:
+            print(green_token_mask)
+            pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
+            print(pos)
+            print("detector inputids",input_ids)
 
         score_dict = dict()
         if return_num_tokens_scored:

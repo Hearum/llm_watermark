@@ -44,6 +44,8 @@ from utils.generation import (
     check_output_lengths,
     tokenize_for_generation,
     generate,
+    model_generate,
+  
 )
 
 
@@ -220,9 +222,9 @@ def main(args):
     else:
         gen_kwargs.update(dict(num_beams=args.num_beams))
 
-    generate_without_watermark = partial(model.generate, **gen_kwargs)
+    generate_without_watermark = partial(model_generate,model=model, **gen_kwargs)
     generate_with_watermark = partial(
-        model.generate, logits_processor=LogitsProcessorList([watermark_processor]), **gen_kwargs
+        model_generate, model=model, logits_processor=LogitsProcessorList([watermark_processor]), **gen_kwargs
     )
 
     # construct the collator
