@@ -438,7 +438,6 @@ class WatermarkDetector(WatermarkBase):
         # observed_count: 观察到的绿色token数量
         # T: token总数
         # self.gamma: 预期的绿色token比例
-
         expected_count = self.gamma
         numer = observed_count - expected_count * T
         denom = sqrt(T * expected_count * (1 - expected_count))

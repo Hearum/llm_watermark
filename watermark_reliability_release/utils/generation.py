@@ -53,7 +53,7 @@ def model_generate(model, tokenizer, input_ids, max_new_tokens=50, do_sample=Fal
     """
     # 初始化生成的 ID（包含输入 ID）
     generated_ids = input_ids
-
+    
     # 用模型生成直到达到 max_length
     for _ in range(max_new_tokens):
         with torch.no_grad():
@@ -63,13 +63,12 @@ def model_generate(model, tokenizer, input_ids, max_new_tokens=50, do_sample=Fal
 
             if logits_processor is not None:
                 for processor in logits_processor:
-                    logits = processor(logits)
+                    logits,_ = processor(generated_ids,logits)
 
             # 进行采样或贪婪搜索
             if do_sample:
                 # 使用温度控制 logits
                 logits = logits / temperature
-
                 # 如果指定了 top_k，限制 logits 到 top_k 个候选
                 if top_k is not None:
                     top_k_indices = logits.topk(top_k, dim=-1).indices

@@ -68,7 +68,8 @@ class WatermarkBase:
         #########LSH#########
         n_hashes: int = 5,               # LSH的哈希函数数量，决定了有多少个桶
         n_features: int = 32 ,            # 每个哈希函数的维度
-        threshold_len = 5,
+        threshold_len = 0,
+        threshold=0.2,
     ):
         # patch now that None could now maybe be passed as seeding_scheme
 
@@ -92,6 +93,7 @@ class WatermarkBase:
         self.lsh_tables = []  # 存储哈希表
         self.token_embeddings = {}  # 存储token的嵌入向量
         self.token_signatures = {}  # 存储token的LSH签名
+        self.threshold = threshold
         self.index_len = 32
         self.hash_key = 15485863
         self.hash_table_ins = self.generate_hash_table_binary_array()
@@ -168,7 +170,42 @@ class WatermarkBase:
         """Seed RNG from local context. Not batched, because the generators we use (like cuda.random) are not batched."""
         prf_key = next_token* self.hash_key 
         self.rng.manual_seed(prf_key.item() % (2**64 - 1)) 
+
+
+    def find_ids_within_percentile(self, ids: torch.LongTensor, fixed_id: int, threshold: float) -> torch.LongTensor:
+        """
+        返回与指定ID距离最近的百分之threshold的ID（基于距离分位数动态确定阈值）
+
+        参数:
+            ids (torch.LongTensor): 待搜索的ID张量（1维）
+            fixed_id (int): 作为参照的固定ID
+            threshold (float): 百分比阈值（0-100），例如20表示最近的20%的ID
+
+        返回:
+            torch.LongTensor: 满足条件的所有ID组成的张量，按距离升序排列
+
+        示例:
+            >>> ids = torch.LongTensor([5, 2, 8, 3, 10])
+            >>> find_ids_within_percentile(ids, fixed_id=5, threshold=20)
+            tensor([5])  # 距离最近的20%的ID（1个）
+        """
+        if len(ids) == 0 or threshold <= 0:
+            return torch.empty(0, dtype=torch.long)
         
+        # 计算距离并排序
+        distances = torch.abs(ids - fixed_id)
+        sorted_distances, sorted_indices = torch.sort(distances)
+        
+        # 计算需选择的ID数量
+        k = int(round(len(ids) * threshold))
+        k = max(1, min(k, len(ids)))  # 保证至少选择1个
+        
+        # 动态确定距离阈值（包含所有相同距离的ID）
+        max_distance = sorted_distances[k-1]
+        mask = distances <= max_distance
+        
+        # 按距离升序返回结果
+        return ids[sorted_indices][:torch.sum(mask).item()]
 
     def _get_greenlist_ids(self, input_ids: torch.LongTensor, next_token:torch.LongTensor) -> torch.LongTensor:
         """根据本地上下文宽度生成随机数种子,并使用这些信息生成绿色列表的ID。"""
@@ -179,9 +216,14 @@ class WatermarkBase:
             device=input_ids.device,
             generator=self.rng)
         
-        extended_indices = self.proj_LSH_Space(input_ids=input_ids)
+        if input_ids.shape[-1] < self.threshold_len:
+            select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
+        else:
+            select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
+
+        extended_indices = self.proj_LSH_Space(input_ids=select_ids)
+        # 
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
-    
         # 4. 选择绿色token
         if self.select_green_tokens:  # 直接选择
             greenlist_ids = vocab_permutation[pointwise_results > 0] 
@@ -190,7 +232,7 @@ class WatermarkBase:
 
 
 class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
-    """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the watermark,
+    """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the /watermark,
     but can also be used as a standalone tool inserted for any model producing scores inbetween model outputs and next token sampler.
     """
 
@@ -305,7 +347,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         """Call with previous context as input_ids, and scores for next token."""
 
         
-        if input_ids.shape[-1] >= self.threshold_len:
+        if input_ids.shape[-1]>1:
             self.rng = torch.Generator(device=input_ids.device) if self.rng is None else self.rng
 
             # NOTE, it would be nice to get rid of this batch loop, but currently,
@@ -318,8 +360,8 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
 
             # 按batch大小循环
             # 我们主要修改的就是这一块的代码
+            # pdb.set_trace()
             for b_idx, input_seq in enumerate(input_ids):
-
                 greenlist_ids = self._score_rejection_sampling(input_seq, scores[b_idx])
                 list_of_greenlist_ids[b_idx] = greenlist_ids
                 if self.store_spike_ents:
@@ -345,7 +387,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 check = greedy_predictions[0][0] in greenlist_ids
             return scores, check
 
-        return scores
+        return scores, False
 
 
 
@@ -382,7 +424,7 @@ class WatermarkDetector(WatermarkBase):
         ignore_repeated_ngrams: bool = False,
         n_hashes: int = 5,               # LSH的哈希函数数量，决定了有多少个桶
         n_features: int = 32 ,            # 每个哈希函数的维度
-        threshold_len = 5,
+        # threshold_len = 5,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -390,7 +432,7 @@ class WatermarkDetector(WatermarkBase):
         assert device, "Must pass device"
         assert tokenizer, "Need an instance of the generating tokenizer to perform detection"
 
-        self.threshold_len = threshold_len
+        # self.threshold_len = threshold_len
         self.tokenizer = tokenizer
         self.device = device
         self.z_threshold = z_threshold
@@ -650,7 +692,7 @@ class WatermarkDetector(WatermarkBase):
                 )
             )
         green_token_count, green_token_mask = 0, []
-
+        
         for idx in range(self.threshold_len, len(input_ids)):
             curr_token = input_ids[idx]
             greenlist_ids = self._get_greenlist_ids(input_ids[:idx],input_ids[idx])
@@ -749,7 +791,6 @@ class WatermarkDetector(WatermarkBase):
         # call score method
         output_dict = {}
 
-
         score_dict = self._score_sequence(tokenized_text, **kwargs)
         if return_scores:
             output_dict.update(score_dict)
@@ -833,6 +874,8 @@ def delete_first_percentage_of_chars(text, delete_percentage=0.3):
     # 返回删除指定比例字符后的文本
     return text[num_to_delete:]
 
+from tqdm import tqdm
+
 def test_llm_v0():
 
     # 指定可见的 GPU 设备
@@ -854,8 +897,8 @@ def test_llm_v0():
                                                     delta=args.delta,
                                                     seeding_scheme=args.seeding_scheme,
                                                     select_green_tokens=args.select_green_tokens)
-    
-    prompt = "def test for this code apple"
+    prompt = "Long long a way, there is a kingdom"
+    #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
     # 编码 prompt
     input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:]
     prefix_len = input_ids.shape[1]
@@ -864,38 +907,39 @@ def test_llm_v0():
 
     # 记录应用水印的位置
     watermark_positions = []
-    max_length = 100
+    max_length = 200
 
     # 按步生成，每一步应用水印处理器
-    for _ in range(max_length):
+    for _ in tqdm(range(max_length)):
         with torch.no_grad():
             # 使用模型输出的 logits
             #logits = torch.randn((1, watermark_processor.vocab_size), device=device)
             outputs = model(generated_ids)
             logits = outputs.logits[:, -1, :]  # 获取最后一个 token 的 logits
-            # 应用水印偏置
+            # # 应用水印偏置
             # pdb.set_trace()
-            biased_logits, whether = watermark_processor(generated_ids, logits)
+            biased_logits, whether = watermark_processor(generated_ids[:,prefix_len:], logits)
             probs = softmax(biased_logits, dim=-1)
 
             # 基于偏置后的 logits 采样下一个 token
             next_token_id = torch.multinomial(probs, num_samples=1)
             generated_ids = torch.cat((generated_ids, next_token_id.to(device)), dim=1)
             if whether:
-                watermark_positions.append((generated_ids.size(1)-1,int(next_token_id)))
+                watermark_positions.append((generated_ids.size(1)-1-prefix_len,int(next_token_id)))
             if next_token_id.item() == tokenizer.eos_token_id:
                 break
-    print("generated_ids",generated_ids.shape)
-    print("generated_ids",generated_ids)
+            
+    print("generated_ids",generated_ids[0,prefix_len:].shape)
+    print("generated_ids",generated_ids[0,prefix_len:])
     # 解码生成的代码
-    generated_code = tokenizer.decode(generated_ids[0].to('cpu'), skip_special_tokens=True)
+    generated_code = tokenizer.decode(generated_ids[0,prefix_len:].to('cpu'), skip_special_tokens=True)
     print("Generated Code:")
     print(generated_code)
     print("Watermark Positions:")
     print(watermark_positions)
 
-    #generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
-    generated_code = delete_first_percentage_of_chars(generated_code, delete_percentage=0.3)
+    generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
+    # generated_code = delete_first_percentage_of_chars(generated_code, delete_percentage=0.3)
     # 初始化 WatermarkDetector 实例
     detector = WatermarkDetector(
         threshold_len=0,

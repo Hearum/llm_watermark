@@ -220,11 +220,12 @@ def main(args):
             )
         )
     else:
-        gen_kwargs.update(dict(num_beams=args.num_beams))
+        pass
+        #gen_kwargs.update(dict(num_beams=args.num_beams))
 
-    generate_without_watermark = partial(model_generate,model=model, **gen_kwargs)
+    generate_without_watermark = partial(model_generate,model=model,tokenizer=tokenizer,**gen_kwargs)
     generate_with_watermark = partial(
-        model_generate, model=model, logits_processor=LogitsProcessorList([watermark_processor]), **gen_kwargs
+        model_generate, model=model,tokenizer=tokenizer, logits_processor=LogitsProcessorList([watermark_processor]), **gen_kwargs
     )
 
     # construct the collator
