@@ -57,14 +57,15 @@ from utils.evaluation import (
 
 print(f"Current huggingface cache dir: {os.environ['HF_HOME']}")
 
+# 禁用 HuggingFace 数据缓存
 from datasets import disable_caching
-
 disable_caching()
 
 
 def main(args):
     ###########################################################################
     # Create output dir if it doesn't exist, and warn if it contains metric file
+    # 如果指定的输出目录已经存在，脚本会检查是否已存在之前生成的文件，避免覆盖已有文件。
     ###########################################################################
     gen_table_w_metrics_path = f"{args.output_dir}/gen_table_w_metrics.jsonl"
     metrics_meta_path = f"{args.output_dir}/gen_table_w_metrics_meta.json"
@@ -96,6 +97,7 @@ def main(args):
     ###########################################################################
 
     # check that all metrics are supported
+    # 检查传入的评估指标是否在支持的指标列表 SUPPORTED_METRICS 中。
     metric_support = [metric in SUPPORTED_METRICS for metric in args.evaluation_metrics]
     assert all(metric_support), (
         f"Unsupported metric '{args.evaluation_metrics[metric_support.index(False)]}' in"
@@ -293,6 +295,7 @@ def main(args):
         assert args.oracle_model_name_or_path, "PPL metric requires oracle model."
 
         # Load the oracle model for PPL measurement
+        # 加载一个预训练的模型（oracle_model）和相应的 tokenizer（oracle_tokenizer）来计算文本困惑度
         oracle_model, oracle_tokenizer, _ = load_oracle_model(args)
 
         # construct the collator
@@ -331,13 +334,17 @@ def main(args):
 
     # Map setup for all dataset operations:
     map_setup = dict(batched=False, load_from_cache_file=False)
+
     ###########################################################################
     # z-score evaluation
     # NOTE: requires a gpu because if original source of watermark randomness,
     # RNG, is gpu based, then detector should be on gpu as well
     ###########################################################################
+
+    # Z-score相关的计算
     if "z-score" in args.evaluation_metrics:
         # set up the partial
+
         compute_z_scores_partial = partial(
             compute_z_scores,
             watermark_detector=watermark_detector,
@@ -371,6 +378,7 @@ def main(args):
 
     ###########################################################################
     # run-len-chisqrd evaluation
+    # 运行长度卡方检验
     ###########################################################################
     if "run-len-chisqrd" in args.evaluation_metrics:
         assert "w_wm_output_green_token_mask" in gen_table_w_windowed_zscore_ds.column_names, (
@@ -380,6 +388,8 @@ def main(args):
         # this ^ is unused currently, but we will need it to remove the assert condition above
 
         # set up the run len chisqrd partial
+
+        # 分析绿色token掩码的分布，计算其运行长度模式是否符合统计学上的随机分布。
         compute_run_len_chisqrd_partial = partial(
             compute_run_len_chsqrd_stats,
             watermark_detector=watermark_detector,

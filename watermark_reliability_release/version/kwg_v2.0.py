@@ -1,4 +1,7 @@
-
+"""
+v12版本:这个版本使用的是将水印扩展到全部上下文中,在上文中找到和对应token最相近的20%下分位的token,利用这部分token映射到LSH空间作为next_token的生成凭据。
+但是有一个缺点是直接删除前面的一大段会导致水印消失。替换的情况下水印强度可以。
+"""
 from __future__ import annotations
 import collections
 from math import sqrt
@@ -197,7 +200,7 @@ class WatermarkBase:
         sorted_distances, sorted_indices = torch.sort(distances)
         
         # 计算需选择的ID数量
-        k = int(round(len(ids) * threshold ))
+        k = int(round(len(ids) * threshold))
         k = max(1, min(k, len(ids)))  # 保证至少选择1个
         
         # 动态确定距离阈值（包含所有相同距离的ID）
@@ -232,7 +235,7 @@ class WatermarkBase:
 
 
 class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
-    """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the watermark,
+    """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the /watermark,
     but can also be used as a standalone tool inserted for any model producing scores inbetween model outputs and next token sampler.
     """
 
@@ -705,10 +708,10 @@ class WatermarkDetector(WatermarkBase):
 
         # HF-style output dictionary
         # 更新字典内容
-        # print(green_token_mask)
-        # pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
-        # print(pos)
-        # print("detector inputids",input_ids)
+        print(green_token_mask)
+        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
+        print(pos)
+        print("detector inputids",input_ids)
 
         score_dict = dict()
         if return_num_tokens_scored:
@@ -938,8 +941,8 @@ def test_llm_v0():
     print("Watermark Positions:")
     print(watermark_positions)
 
-    #generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
-    generated_code = delete_first_percentage_of_chars(generated_code, delete_percentage=0.3)
+    generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
+    # generated_code = delete_first_percentage_of_chars(generated_code, delete_percentage=0.3)
     # 初始化 WatermarkDetector 实例
     detector = WatermarkDetector(
         threshold_len=0,

@@ -53,7 +53,7 @@ def model_generate(model, tokenizer, input_ids, max_new_tokens=50, do_sample=Fal
     """
     # 初始化生成的 ID（包含输入 ID）
     generated_ids = input_ids
-    
+    prefix_len = input_ids.shape[1]
     # 用模型生成直到达到 max_length
     for _ in range(max_new_tokens):
         with torch.no_grad():
@@ -63,7 +63,7 @@ def model_generate(model, tokenizer, input_ids, max_new_tokens=50, do_sample=Fal
 
             if logits_processor is not None:
                 for processor in logits_processor:
-                    logits,_ = processor(generated_ids,logits)
+                    logits,_ = processor(generated_ids[:,prefix_len:],logits)
 
             # 进行采样或贪婪搜索
             if do_sample:

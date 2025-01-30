@@ -197,7 +197,7 @@ class WatermarkBase:
         sorted_distances, sorted_indices = torch.sort(distances)
         
         # 计算需选择的ID数量
-        k = int(round(len(ids) * threshold))
+        k = int(round(len(ids) * threshold ))
         k = max(1, min(k, len(ids)))  # 保证至少选择1个
         
         # 动态确定距离阈值（包含所有相同距离的ID）
@@ -220,7 +220,7 @@ class WatermarkBase:
             select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
         else:
             select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
-
+        
         extended_indices = self.proj_LSH_Space(input_ids=select_ids)
         # 
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
@@ -232,7 +232,7 @@ class WatermarkBase:
 
 
 class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
-    """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the /watermark,
+    """LogitsProcessor modifying model output scores in a pipe. Can be used in any HF pipeline to modify scores to fit the watermark,
     but can also be used as a standalone tool inserted for any model producing scores inbetween model outputs and next token sampler.
     """
 
@@ -346,7 +346,6 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         """Call with previous context as input_ids, and scores for next token."""
 
-        
         if input_ids.shape[-1]>1:
             self.rng = torch.Generator(device=input_ids.device) if self.rng is None else self.rng
 
@@ -422,8 +421,8 @@ class WatermarkDetector(WatermarkBase):
         #homoglyphs": 同形字符标准化，处理视觉上相似或相同但使用不同Unicode码点的字符
         #"truecase": 大小写标准化，将文本转换为其"正确"的大小写形式
         ignore_repeated_ngrams: bool = False,
-        n_hashes: int = 5,               # LSH的哈希函数数量，决定了有多少个桶
-        n_features: int = 32 ,            # 每个哈希函数的维度
+        # n_hashes: int = 5,               # LSH的哈希函数数量，决定了有多少个桶
+        # n_features: int = 32 ,            # 每个哈希函数的维度
         # threshold_len = 5,
         **kwargs,
     ):
@@ -938,8 +937,8 @@ def test_llm_v0():
     print("Watermark Positions:")
     print(watermark_positions)
 
-    generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
-    # generated_code = delete_first_percentage_of_chars(generated_code, delete_percentage=0.3)
+    #generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
+    #generated_code = delete_first_percentage_of_chars(generated_code, delete_percentage=0.3)
     # 初始化 WatermarkDetector 实例
     detector = WatermarkDetector(
         threshold_len=0,
@@ -978,6 +977,96 @@ def test_llm_v0():
     # # 输出检测结果
     # print("Detection Result:", detection_result)
     # green_token_mask = detection_result.get('green_token_mask', [])
+def test_detector():
+    
+    # 指定可见的 GPU 设备
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # 初始化 Accelerator
+    args = Args(gamma=0.25, delta=2.0, max_new_tokens=100, use_sampling=False, sampling_temp=0.9, n_beams=3)
 
+    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    # model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True,device_map = "auto")
+    # device =model.device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 初始化水印处理器
+    print(f"Generating with {args}")
+    
+
+    prompt = "Long long a way, there is a kingdom"
+    #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
+    # 编码 prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:]
+    prefix_len = input_ids.shape[1]
+    print("prefix_len", prefix_len)
+    generated_ids = input_ids.to(device)
+
+    generated_code = tokenizer.decode(generated_ids[0,prefix_len:].to('cpu'), skip_special_tokens=True)
+
+
+    #generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
+    generated_code = "o happy. The horse slowed down. It was tired. It needed food. The horse galloped. It was happy to gallop. The horse stopped. It was at the kingdom. It was the border. The horse galloped. It was at the boundary. It was happy. The horse was free. The horse three. The horse galloped. It was so happy. The horse was killed by a wolf. The wolf was happy. The wolf was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The"
+    # 初始化 WatermarkDetector 实例
+    detector = WatermarkDetector(
+        threshold_len=0,
+        gamma=args.gamma,
+        delta=args.delta,
+        device=device,
+        tokenizer=tokenizer,
+        vocab=list(tokenizer.get_vocab().values()),
+        z_threshold=4.0,
+        normalizers=["unicode"],
+        ignore_repeated_ngrams=False,
+    )
+    
+    result = detector.detect(text=generated_code)
+    # 输出结果
+    print("raw_test_text检测结果:")
+    for key, value in result.items():
+        print(f"{key}: {value}")
+
+def test_no_watermark_test():
+
+    # 指定可见的 GPU 设备
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # 初始化 Accelerator
+    args = Args(gamma=0.25, delta=2.0, max_new_tokens=100, use_sampling=False, sampling_temp=0.9, n_beams=3)
+
+    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True,device_map = "auto")
+    device =model.device
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 初始化水印处理器
+    print(f"Generating with {args}")
+    
+    # 创建 WatermarkLogitsProcessor
+    prompt = "Long long a way, there is a kingdom"
+    #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
+    # 编码 prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:].to(device)
+    output = model.generate(
+        input_ids,
+        max_length=200,
+    )
+    out = tokenizer.decode(output[0], skip_special_tokens=True)
+    detector = WatermarkDetector(
+        threshold_len=0,
+        gamma=args.gamma,
+        delta=args.delta,
+        device=device,
+        tokenizer=tokenizer,
+        vocab=list(tokenizer.get_vocab().values()),
+        z_threshold=4.0,
+        normalizers=["unicode"],
+        ignore_repeated_ngrams=False,
+    )
+    
+    result = detector.detect(text=out)
+    # 输出结果
+    print("raw_test_text检测结果:")
+    for key, value in result.items():
+        print(f"{key}: {value}")
 if __name__ == '__main__':
-    test_llm_v0()
+    test_no_watermark_test()
+    # test_detector()

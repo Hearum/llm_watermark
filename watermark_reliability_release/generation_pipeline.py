@@ -197,6 +197,9 @@ def main(args):
         vocab=list(tokenizer.get_vocab().values()),
         gamma=args.gamma,
         delta=args.delta,
+        n_hashes=args.n_hashes,
+        n_features=args.n_features,
+        threshold=args.threshold,
         seeding_scheme=args.seeding_scheme,
         store_spike_ents=args.store_spike_ents,
         select_green_tokens=True,
@@ -623,6 +626,22 @@ if __name__ == "__main__":
         default=False,
         help="Allow overwriting of old generation files at the same output location.",
     )
+    parser.add_argument(
+        "--n_hashes",
+        type=int,
+        default=5,
+    )    
+    parser.add_argument(
+        "--n_features",
+        type=int,
+        default=32,
+    )    
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.2,
+    )
+
     args = parser.parse_args()
 
     ###########################################################################
