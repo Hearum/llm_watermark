@@ -36,10 +36,40 @@ from .data.essays import load_essays
 from .data.wikitext import load_wikitext
 
 MAX_GENERATIONS = int(10000)  # Hardcoded max length to avoid infinite loop
-
+from transformers import LogitsProcessorList
+import pdb
 import torch
 
-def model_generate(model, tokenizer, input_ids, max_new_tokens=50, do_sample=False, top_k=None, top_p=None, temperature=1.0, logits_processor=None):
+
+def model_generate(model,input_ids,logits_processor=None):
+    prefix_len = input_ids.shape[1]
+    if logits_processor is not None:
+        logits_processor.prefix_len = prefix_len
+        assert logits_processor.prefix_len !=0
+        output_w = model.generate(
+            input_ids,
+            max_new_tokens=200,
+            num_beams=1,
+            do_sample=False,
+            repetition_penalty=1.2,
+            logits_processor=LogitsProcessorList([logits_processor]),
+            temperature=None,  # ✅ 取消 temperature
+            top_p=None  # ✅ 取消 top_p
+        )
+        return output_w[:,prefix_len:] 
+    else:
+        output = model.generate(
+            input_ids,
+            max_new_tokens=200,
+            num_beams=1,
+            do_sample=False,
+            repetition_penalty=1.2,
+            temperature=None,  # ✅ 取消 temperature
+            top_p=None  # ✅ 取消 top_p
+        )  
+        return output[:,prefix_len:]
+
+def model_generate_v0(model, tokenizer, input_ids, max_new_tokens=50, do_sample=False, top_k=None, top_p=None, temperature=1.0, logits_processor=None):
     """
     :param model: 预训练模型
     :param tokenizer: 用于编码和解码的tokenizer

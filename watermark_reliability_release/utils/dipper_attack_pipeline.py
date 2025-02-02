@@ -10,7 +10,7 @@ from nltk.tokenize import sent_tokenize
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
 
-nltk.download("punkt")
+# nltk.download("punkt")
 
 
 def generate_dipper_paraphrases(

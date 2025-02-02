@@ -268,18 +268,18 @@ T_and_F_runs_dummy_dict_no_bins = {
 
 
 def chi_squared_runs_test(
-    bool_arr=None,
-    succ_prob=None,
-    variant="F_succ_T_runs",
-    bin_spec=200,
-    verbose=False,
-    invert_bools=False,
-    return_bin_counts=False,
-    mask_zeros=False,
-    mask_leading_bins=0,
-    diy=False,
-    lambda_="pearson",
-    return_dict=False,
+    bool_arr=None,                # 输入的布尔数组，表示成功/失败的序列
+    succ_prob=None,               # 成功概率（理论值），用于计算期望分布
+    variant="F_succ_T_runs",      # 计算运行长度的方法（不同的计算规则）
+    bin_spec=200,                 # 直方图的 bin 数量（或最大 bin 值）
+    verbose=False,                # 是否打印详细信息
+    invert_bools=False,           # 是否反转布尔值（将 True/False 互换）
+    return_bin_counts=False,      # 是否返回每个 bin（运行长度）的计数
+    mask_zeros=False,             # 是否忽略零值
+    mask_leading_bins=0,          # 忽略前几个 bin 的数据
+    diy=False,                    # 是否使用自定义的卡方检验
+    lambda_="pearson",            # 卡方检验方法（Pearson, G-Test, Cressie-Read）
+    return_dict=False,            # 是否返回字典格式的结果
 ):
     """
     Returns the chi squared statistic and p-value for the given data.

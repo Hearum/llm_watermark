@@ -156,6 +156,7 @@ class WatermarkBase:
                 indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
             else:
                 indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
+
         extended_indices = torch.cat(indices)
         if extended_indices.size(0) > self.vocab_size:
             extended_indices = extended_indices[:self.vocab_size]
@@ -235,9 +236,9 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
     but can also be used as a standalone tool inserted for any model producing scores inbetween model outputs and next token sampler.
     """
 
-    def __init__(self, *args,prefix_len,store_spike_ents: bool = False, **kwargs):
+    def __init__(self, *args, store_spike_ents: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.prefix_len = prefix_len
+
         self.store_spike_ents = store_spike_ents
         self.spike_entropies = None # 怎么还配置熵计算的功能
         if self.store_spike_ents: #是否开启存储熵峰值计算功能
@@ -344,10 +345,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         """Call with previous context as input_ids, and scores for next token."""
-        # #############
-        # 这里是为了测试加的prompt长度
-        ################
-        input_ids = input_ids[:,self.prefix_len:]
+
         if input_ids.shape[-1]>1:
             self.rng = torch.Generator(device=input_ids.device) if self.rng is None else self.rng
 
@@ -381,14 +379,14 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 scores=scores, greenlist_mask=green_tokens_mask, greenlist_bias=self.delta
             )
 
-            # debug = True
-            # if  debug:
-            # # pdb.set_trace()
-            #     sorted_scores, greedy_predictions = scores.sort(dim=-1, descending=True)
-            #     check = greedy_predictions[0][0] in greenlist_ids
-            # return scores, check
+            debug = True
+            if  debug:
+            # pdb.set_trace()
+                sorted_scores, greedy_predictions = scores.sort(dim=-1, descending=True)
+                check = greedy_predictions[0][0] in greenlist_ids
+            return scores, check
 
-        return scores
+        return scores, False
 
 
 
@@ -979,7 +977,6 @@ def test_llm_v0():
     # # 输出检测结果
     # print("Detection Result:", detection_result)
     # green_token_mask = detection_result.get('green_token_mask', [])
-
 def test_detector():
     
     # 指定可见的 GPU 设备
@@ -1044,52 +1041,15 @@ def test_no_watermark_test():
     print(f"Generating with {args}")
     
     # 创建 WatermarkLogitsProcessor
-    prompt = "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing game where players take control of a military unit and take part in missions against enemy forces . Stories are told through comic book @-@ like panels with"
+    prompt = "Long long a way, there is a kingdom"
     #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
     # 编码 prompt
     input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:].to(device)
-    prefix_len = input_ids.shape[1]
-    torch.manual_seed(48)  
     output = model.generate(
         input_ids,
         max_length=200,
-        num_beams=1,
-        do_sample=False,
-        repetition_penalty=1.2,
-        temperature=None,  # ✅ 取消 temperature
-        top_p=None  # ✅ 取消 top_p
     )
-    no_watermark_out = tokenizer.decode(output[0,prefix_len:], skip_special_tokens=True)
-
-    watermark_processor = WatermarkLogitsProcessor(prefix_len = prefix_len,
-                                                    vocab=list(tokenizer.get_vocab().values()),
-                                                    gamma=args.gamma,
-                                                    delta=args.delta,
-                                                    seeding_scheme=args.seeding_scheme,
-                                                    select_green_tokens=args.select_green_tokens)
-    
-    '''
-    called the land of the gods. The people here live for more than 100 years and their bodies are very healthy. 
-    There was an old woman who lived in this kingdom. She was so happy because she had three sons. However one day her husband died. 
-    When he was alive they were very happy together but after his death everything changed. Her sons started to fight each other about 
-    which one should get the inheritance. They even killed each others’ wives. It was not enough when the last son killed his father. He said: 
-    “I will kill everyone on earth.” And he tried it. But he could not do anything against the power of the gods. Soon he found out that he was defeated by the gods. His life ended like all the lives before him.This story happened many centuries ago. 
-    Today we know it as the mythology. We can say it was the first book ever written down. People wrote stories
-    '''
-
-    from transformers import LogitsProcessorList
-    output_w = model.generate(
-        input_ids,
-        max_length=200,
-        num_beams=1,
-        do_sample=False,
-        repetition_penalty=1.2,
-        logits_processor=LogitsProcessorList([watermark_processor]),
-        temperature=None,  # ✅ 取消 temperature
-        top_p=None  # ✅ 取消 top_p
-    )
-    watermark_out = tokenizer.decode(output_w[0,prefix_len:], skip_special_tokens=True)
-
+    out = tokenizer.decode(output[0], skip_special_tokens=True)
     detector = WatermarkDetector(
         threshold_len=0,
         gamma=args.gamma,
@@ -1102,18 +1062,11 @@ def test_no_watermark_test():
         ignore_repeated_ngrams=False,
     )
     
-    result = detector.detect(text=no_watermark_out)
+    result = detector.detect(text=out)
     # 输出结果
-    print("no_watermark_out检测结果:")
+    print("raw_test_text检测结果:")
     for key, value in result.items():
         print(f"{key}: {value}")
-
-    result = detector.detect(text=watermark_out)
-    # 输出结果
-    print("no_watermark_out检测结果:")
-    for key, value in result.items():
-        print(f"{key}: {value}")
-    print(model.config)
 if __name__ == '__main__':
     test_no_watermark_test()
     # test_detector()

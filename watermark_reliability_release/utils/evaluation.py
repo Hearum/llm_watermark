@@ -67,7 +67,7 @@ def conditional_no_check_args(no_check_args, evaluation_metrics, args):
 # These are the metrics we support
 SUPPORTED_METRICS = [
     "z-score",
-    "windowed-z-score",
+    # "windowed-z-score",
     "run-len-chisqrd",
     "ppl",
     "diversity",
@@ -77,6 +77,7 @@ SUPPORTED_METRICS = [
     "mauve",
     "detect-retrieval",
     "detectgpt",
+    "test"
 ]
 
 # These are the output text columns we want to compute metrics on
@@ -88,13 +89,17 @@ OUTPUT_TEXT_COLUMN_NAMES = [
 ]
 
 # etc for other evaluation types
-ZSCORE_TEXT_COLUMN_NAMES = OUTPUT_TEXT_COLUMN_NAMES
-RUN_LEN_CHISQRD_TEXT_COLUMN_NAMES = OUTPUT_TEXT_COLUMN_NAMES
-REPETITION_TEXT_COLUMN_NAMES = OUTPUT_TEXT_COLUMN_NAMES
+ZSCORE_TEXT_COLUMN_NAMES = OUTPUT_TEXT_COLUMN_NAMES # 计算 Z-Score（水印强度
+RUN_LEN_CHISQRD_TEXT_COLUMN_NAMES = OUTPUT_TEXT_COLUMN_NAMES # 计算卡方检验（Chi-Squared Test）
+REPETITION_TEXT_COLUMN_NAMES = OUTPUT_TEXT_COLUMN_NAMES # 用于检测文本重复度
+
 # note the convention of including the input as 0th column
-COHERENCE_TEXT_COLUMN_NAMES = ["truncated_input"] + OUTPUT_TEXT_COLUMN_NAMES
+# 计算文本连贯性（Coherence）
+# 结合上文的内容，然后评估下文的文本的连贯成都
+COHERENCE_TEXT_COLUMN_NAMES = ["truncated_input"] + OUTPUT_TEXT_COLUMN_NAMES 
 
 # These are the column pairs we want to compute p-sp for
+# 计算 P-SP 统计显著性测试，定义了 需要进行配对比较的文本列
 OUTPUT_TEXT_PAIR_COLUMN_NAMES = [
     ["baseline_completion", "no_wm_output"],
     ["baseline_completion", "w_wm_output"],
@@ -102,23 +107,25 @@ OUTPUT_TEXT_PAIR_COLUMN_NAMES = [
     ["no_wm_output", "w_wm_output"],
     ["w_wm_output", "w_wm_output_attacked"],
 ]
-
+# 表示要计算 P-SP 统计显著性 的文本对
 P_SP_TEXT_PAIR_COLUMN_NAMES = OUTPUT_TEXT_PAIR_COLUMN_NAMES
+# 表示要计算 MAUVE（文本分布相似性） 的文本对
 MAUVE_TEXT_PAIR_COLUMN_NAMES = OUTPUT_TEXT_PAIR_COLUMN_NAMES
 
-
+# 在main函数里面需要检测的内容，上面是需要检测的对象
 ROC_TEST_STAT_SUFFIXES = [
     "z_score",
-    "win20-1_z_score",
-    "win40-1_z_score",
-    "winmax-1_z_score",
-    "run_len_chisqrd_statistic",
-    "retrieval_score",
+    # "win20-1_z_score",
+    # "win40-1_z_score",
+    # "winmax-1_z_score",
+    # "run_len_chisqrd_statistic",
+    # "retrieval_score",
     "detectgpt_score_100_z",
     "detectgpt_score_100_d",
 ]
 
-FILTER_BY_COLUMNS = ["baseline_completion", "no_wm_output", "w_wm_output"]
+# 这些列用于筛选数据，只对这些列执行某些评估或统计计算
+FILTER_BY_COLUMNS = ["baseline_completion", "no_wm_output", "w_wm_output","w_wm_output_attacked"]
 
 
 def concat_rows(examples, tokenizer=None, args=None):
@@ -607,7 +614,7 @@ def compute_repetition_diversity(example, include_repetition=False, include_dive
                 example[f"{col_name}_log_diversity"] = results_tuple["log_diversity"]
     return example
 
-
+# 计算数据集中不同文本列的 P-SP（Paraphrase Similarity Probability，释义相似性概率）分数
 def compute_p_sp(dataset):
     for column_pair in P_SP_TEXT_PAIR_COLUMN_NAMES:
         if column_pair[0] in dataset.features and column_pair[1] in dataset.features:
@@ -620,7 +627,7 @@ def compute_p_sp(dataset):
             dataset = dataset.add_column(f"{column_pair[0]}_vs_{column_pair[1]}_p_sp", p_sp_scores)
     return dataset
 
-
+# 计算 MAUVE 评分 评估 AI 生成文本（q_text）与参考文本（p_text）之间的质量差异。
 def compute_mauve(dataset):
     """
     The current convention is to repeat the score for all rows in the dataset
@@ -640,7 +647,8 @@ def compute_mauve(dataset):
             )
     return dataset
 
-
+# 计算文本的连贯性得分（Coherence Score），衡量 生成文本（generated_text）是否与前缀文本（prefix_text）语义相关。
+# 使用 SimCSE 计算相似度矩阵，并取其 对角线均值（trace mean） 作为最终连贯性得分。
 def compute_coherence(dataset):
     """
     Assumes the first column is the prefix or prompt to the model
@@ -668,6 +676,8 @@ def compute_detect_retrieval(dataset, args=None):
     # then mock it using the w_wm_output, just means the two score cols will be the same
     # and we'll need to delete it after
     was_real_attacked_ds = True
+    
+    # 如果没有攻击的结果，就假装有攻击结果，然后最后再删除掉
     if "w_wm_output_attacked" not in dataset.features:
         # were faking it
         was_real_attacked_ds = False

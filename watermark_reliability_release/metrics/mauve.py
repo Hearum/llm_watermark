@@ -7,7 +7,8 @@ requirement: pip install mauve-text (https://github.com/krishnap25/mauve)
 from transformers import AutoTokenizer
 import mauve
 
-
+# 计算 MAUVE 评分 评估 AI 生成文本（q_text）与参考文本（p_text）之间的质量差异。
+# MAUVE 评分越接近 1.0，AI 生成的文本质量越好
 def get_mauve_score(
     p_text, q_text, max_len=128, verbose=False, device_id=0, featurize_model_name="gpt2"
 ):

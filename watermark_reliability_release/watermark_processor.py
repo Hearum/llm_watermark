@@ -1,4 +1,6 @@
-
+###############
+# 改回使用generater方法生成水印了
+###############
 from __future__ import annotations
 import collections
 from math import sqrt
@@ -220,7 +222,7 @@ class WatermarkBase:
             select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
         else:
             select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
-
+        
         extended_indices = self.proj_LSH_Space(input_ids=select_ids)
         # 
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
@@ -236,9 +238,9 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
     but can also be used as a standalone tool inserted for any model producing scores inbetween model outputs and next token sampler.
     """
 
-    def __init__(self, *args, store_spike_ents: bool = False, **kwargs):
+    def __init__(self, *args,prefix_len,store_spike_ents: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.prefix_len = prefix_len
         self.store_spike_ents = store_spike_ents
         self.spike_entropies = None # 怎么还配置熵计算的功能
         if self.store_spike_ents: #是否开启存储熵峰值计算功能
@@ -329,9 +331,9 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                     break
                 # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
-                    if len(final_greenlist)< 1 :
-                        print(self.rejection_count,len(final_greenlist) ,sorted_scores[0] - sorted_scores[idx + 1],False)
-                        self.rejection_count = self.rejection_count+1
+                    # if len(final_greenlist)< 1 :
+                    #     print(self.rejection_count,len(final_greenlist) ,sorted_scores[0] - sorted_scores[idx + 1],False)
+                    #     self.rejection_count = self.rejection_count+1
                     break
             elif tail_rule == "fixed_list_length":
                 if len(final_greenlist) == 10:
@@ -345,8 +347,10 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         """Call with previous context as input_ids, and scores for next token."""
-
-        
+        # #############
+        # 这里是为了测试加的prompt长度
+        ################
+        input_ids = input_ids[:,self.prefix_len:]
         if input_ids.shape[-1]>1:
             self.rng = torch.Generator(device=input_ids.device) if self.rng is None else self.rng
 
@@ -380,14 +384,14 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 scores=scores, greenlist_mask=green_tokens_mask, greenlist_bias=self.delta
             )
 
-            debug = True
-            if  debug:
-            # pdb.set_trace()
-                sorted_scores, greedy_predictions = scores.sort(dim=-1, descending=True)
-                check = greedy_predictions[0][0] in greenlist_ids
-            return scores, check
+            # debug = True
+            # if  debug:
+            # # pdb.set_trace()
+            #     sorted_scores, greedy_predictions = scores.sort(dim=-1, descending=True)
+            #     check = greedy_predictions[0][0] in greenlist_ids
+            # return scores, check
 
-        return scores, False
+        return scores
 
 
 
@@ -422,8 +426,8 @@ class WatermarkDetector(WatermarkBase):
         #homoglyphs": 同形字符标准化，处理视觉上相似或相同但使用不同Unicode码点的字符
         #"truecase": 大小写标准化，将文本转换为其"正确"的大小写形式
         ignore_repeated_ngrams: bool = False,
-        n_hashes: int = 5,               # LSH的哈希函数数量，决定了有多少个桶
-        n_features: int = 32 ,            # 每个哈希函数的维度
+        # n_hashes: int = 5,               # LSH的哈希函数数量，决定了有多少个桶
+        # n_features: int = 32 ,            # 每个哈希函数的维度
         # threshold_len = 5,
         **kwargs,
     ):
@@ -705,10 +709,10 @@ class WatermarkDetector(WatermarkBase):
 
         # HF-style output dictionary
         # 更新字典内容
-        # print(green_token_mask)
-        # pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
-        # print(pos)
-        # print("detector inputids",input_ids)
+        print(green_token_mask)
+        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
+        print(pos)
+        print("detector inputids",input_ids)
 
         score_dict = dict()
         if return_num_tokens_scored:
@@ -939,7 +943,7 @@ def test_llm_v0():
     print(watermark_positions)
 
     #generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
-    generated_code = delete_first_percentage_of_chars(generated_code, delete_percentage=0.3)
+    #generated_code = delete_first_percentage_of_chars(generated_code, delete_percentage=0.3)
     # 初始化 WatermarkDetector 实例
     detector = WatermarkDetector(
         threshold_len=0,
@@ -979,5 +983,140 @@ def test_llm_v0():
     # print("Detection Result:", detection_result)
     # green_token_mask = detection_result.get('green_token_mask', [])
 
+def test_detector():
+    
+    # 指定可见的 GPU 设备
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # 初始化 Accelerator
+    args = Args(gamma=0.25, delta=2.0, max_new_tokens=100, use_sampling=False, sampling_temp=0.9, n_beams=3)
+
+    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    # model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True,device_map = "auto")
+    # device =model.device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 初始化水印处理器
+    print(f"Generating with {args}")
+    
+
+    prompt = "Long long a way, there is a kingdom"
+    #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
+    # 编码 prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:]
+    prefix_len = input_ids.shape[1]
+    print("prefix_len", prefix_len)
+    generated_ids = input_ids.to(device)
+
+    generated_code = tokenizer.decode(generated_ids[0,prefix_len:].to('cpu'), skip_special_tokens=True)
+
+
+    #generated_code= delete_random_elements(generated_code, delete_percentage=0.3)
+    generated_code = "o happy. The horse slowed down. It was tired. It needed food. The horse galloped. It was happy to gallop. The horse stopped. It was at the kingdom. It was the border. The horse galloped. It was at the boundary. It was happy. The horse was free. The horse three. The horse galloped. It was so happy. The horse was killed by a wolf. The wolf was happy. The wolf was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The horse was happy. The"
+    # 初始化 WatermarkDetector 实例
+    detector = WatermarkDetector(
+        threshold_len=0,
+        gamma=args.gamma,
+        delta=args.delta,
+        device=device,
+        tokenizer=tokenizer,
+        vocab=list(tokenizer.get_vocab().values()),
+        z_threshold=4.0,
+        normalizers=["unicode"],
+        ignore_repeated_ngrams=False,
+    )
+    
+    result = detector.detect(text=generated_code)
+    # 输出结果
+    print("raw_test_text检测结果:")
+    for key, value in result.items():
+        print(f"{key}: {value}")
+
+def test_no_watermark_test():
+
+    # 指定可见的 GPU 设备
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # 初始化 Accelerator
+    args = Args(gamma=0.25, delta=2.0, max_new_tokens=100, use_sampling=False, sampling_temp=0.9, n_beams=3)
+
+    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True,device_map = "auto")
+    device =model.device
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 初始化水印处理器
+    print(f"Generating with {args}")
+    
+    # 创建 WatermarkLogitsProcessor
+    prompt = "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing game where players take control of a military unit and take part in missions against enemy forces . Stories are told through comic book @-@ like panels with"
+    #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
+    # 编码 prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:].to(device)
+    prefix_len = input_ids.shape[1]
+    torch.manual_seed(48)  
+    output = model.generate(
+        input_ids,
+        max_length=200,
+        num_beams=1,
+        do_sample=False,
+        repetition_penalty=1.2,
+        temperature=None,  # ✅ 取消 temperature
+        top_p=None  # ✅ 取消 top_p
+    )
+    no_watermark_out = tokenizer.decode(output[0,prefix_len:], skip_special_tokens=True)
+
+    watermark_processor = WatermarkLogitsProcessor(prefix_len = prefix_len,
+                                                    vocab=list(tokenizer.get_vocab().values()),
+                                                    gamma=args.gamma,
+                                                    delta=args.delta,
+                                                    seeding_scheme=args.seeding_scheme,
+                                                    select_green_tokens=args.select_green_tokens)
+    
+    '''
+    called the land of the gods. The people here live for more than 100 years and their bodies are very healthy. 
+    There was an old woman who lived in this kingdom. She was so happy because she had three sons. However one day her husband died. 
+    When he was alive they were very happy together but after his death everything changed. Her sons started to fight each other about 
+    which one should get the inheritance. They even killed each others’ wives. It was not enough when the last son killed his father. He said: 
+    “I will kill everyone on earth.” And he tried it. But he could not do anything against the power of the gods. Soon he found out that he was defeated by the gods. His life ended like all the lives before him.This story happened many centuries ago. 
+    Today we know it as the mythology. We can say it was the first book ever written down. People wrote stories
+    '''
+
+    from transformers import LogitsProcessorList
+    output_w = model.generate(
+        input_ids,
+        max_length=200,
+        num_beams=1,
+        do_sample=False,
+        repetition_penalty=1.2,
+        logits_processor=LogitsProcessorList([watermark_processor]),
+        temperature=None,  # ✅ 取消 temperature
+        top_p=None  # ✅ 取消 top_p
+    )
+    watermark_out = tokenizer.decode(output_w[0,prefix_len:], skip_special_tokens=True)
+
+    detector = WatermarkDetector(
+        threshold_len=0,
+        gamma=args.gamma,
+        delta=args.delta,
+        device=device,
+        tokenizer=tokenizer,
+        vocab=list(tokenizer.get_vocab().values()),
+        z_threshold=4.0,
+        normalizers=["unicode"],
+        ignore_repeated_ngrams=False,
+    )
+    
+    result = detector.detect(text=no_watermark_out)
+    # 输出结果
+    print("no_watermark_out检测结果:")
+    for key, value in result.items():
+        print(f"{key}: {value}")
+
+    result = detector.detect(text=watermark_out)
+    # 输出结果
+    print("no_watermark_out检测结果:")
+    for key, value in result.items():
+        print(f"{key}: {value}")
+    print(model.config)
 if __name__ == '__main__':
-    test_llm_v0()
+    test_no_watermark_test()
+    # test_detector()

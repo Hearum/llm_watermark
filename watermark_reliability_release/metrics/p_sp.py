@@ -61,6 +61,10 @@ def batcher(params, batch):
     vecs = params.model.encode(x, l)
     return vecs.detach().cpu().numpy()
 
+'''
+计算 P-SP Paraphrase Similarity Probability,释义相似度概率，评估两个文本输入 
+(input1, input2) 之间的语义相似度，可能用于 文本水印检测、释义检测或文本相似性计算。
+'''
 def evaluate_p_sp(input1, input2, use_sent_transformers=False):
     download_url = 'http://www.cs.cmu.edu/~jwieting/paraphrase-at-scale-english.zip'
     download_dir = './metrics/p_sp_utils'

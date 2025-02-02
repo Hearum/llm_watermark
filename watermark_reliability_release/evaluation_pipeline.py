@@ -21,7 +21,7 @@ import os
 import argparse
 from functools import partial
 from tqdm import tqdm
-
+import pdb
 import wandb
 import torch
 import numpy as np
@@ -339,6 +339,7 @@ def main(args):
     # z-score evaluation
     # NOTE: requires a gpu because if original source of watermark randomness,
     # RNG, is gpu based, then detector should be on gpu as well
+    # 最基本的z-score检验
     ###########################################################################
 
     # Z-score相关的计算
@@ -360,6 +361,7 @@ def main(args):
 
     ###########################################################################
     # Windowed z-score evaluation
+    # 滑动窗口检验
     ###########################################################################
 
     if "windowed-z-score" in args.evaluation_metrics:
@@ -404,6 +406,7 @@ def main(args):
 
     ###########################################################################
     # Diversity and Repetition evaluation
+    # 文本多样性和重复性检验
     ###########################################################################
 
     if "repetition" in args.evaluation_metrics or "diversity" in args.evaluation_metrics:
@@ -422,6 +425,7 @@ def main(args):
 
     ###########################################################################
     # P-SP evaluation
+    # P-SP分布检验
     ###########################################################################
 
     if "p-sp" in args.evaluation_metrics:
@@ -432,6 +436,7 @@ def main(args):
 
     ###########################################################################
     # Coherence evaluation
+    # 文本上下文连贯性计算
     ###########################################################################
 
     if "coherence" in args.evaluation_metrics:
@@ -483,8 +488,11 @@ def main(args):
                 .describe()
             )
 
+    print("prefix_length")
+    pdb.set_trace()
     ###########################################################################
     # Detectgpt detection
+    # DetectGPT 不能与其他评估指标同时运行，因此 args.evaluation_metrics 必须 只包含 ["detectgpt"]。如果 args.evaluation_metrics 包含其他指标，则触发 assert 报错。
     ###########################################################################
     if "detectgpt" in args.evaluation_metrics:
         assert args.evaluation_metrics == ["detectgpt"], (
@@ -498,6 +506,7 @@ def main(args):
             f"Detectgpt metric requires the detectgpt_score column to be computed previously "
             f"but no such cols exist in this file."
         )
+        # 在这一步之前就已经计算好了ROC-AUC了
         print(
             f"Evaluating detectgpt by simply computing ROC-AUC metrics on the scores that already exist"
         )
@@ -674,22 +683,34 @@ def main(args):
         # manually at each prefix length.  Use groupby to compute the mean and std
         # for each prefix length for any of the feats that have retrieval_score in them,
         # then log those pairs to wandb.
+
+        # 先计算ROC-AUC，因为这个计算的最快
+        # 
+        # 将数据集转换为 Pandas DataFrame
         at_T_df = gen_table_w_metrics_ds.to_pandas()
 
+        #  遍历所有 retrieval_score 相关的特征列
         for name, feat in gen_table_w_metrics_ds.features.items():
             if "retrieval_score" in name and "prefix_length" in at_T_df.columns:
+                # 筛选包含 retrieval_score 的列，如："baseline_completion_retrieval_score"、"w_wm_output_retrieval_score"、"w_wm_output_attacked_retrieval_score"
                 # compute the mean and std for each prefix length
                 # and log those pairs to wandb
+
+                # 随着各个长度前缀长度计算平均值和方差，然后加载到wandb上面去
                 df_view = at_T_df.groupby("prefix_length")[name].describe()[["mean", "std"]]
                 T_indices = df_view.index
 
                 # for idx, (mean, std) in df_view.iterrows():
                 #     run.log(data={f"{name}_mean": mean, f"{name}_std": std, "idx_T": idx})
+
                 # log this triple as a table instead like the ROC curve above
                 # where the first two are plotted and the third is the x axis
+
+                # 创建 WandB 表格，存储 prefix_length（idx_T）、均值 mean 和标准差 std。
                 data = [[x, y, z] for x, (y, z) in df_view.iterrows()]
                 table = wandb.Table(data=data, columns=["idx_T", "mean", "std"])
                 # compute stderr from std
+                # 计算标准差
                 table.add_column(
                     "stderr",
                     [
@@ -698,8 +719,10 @@ def main(args):
                     ],
                 )
                 # first log mean
+                # 绘制 retrieval_score 的均值曲线（不同 prefix_length 下）
                 run.log({f"{name}": wandb.plot.line(table, "idx_T", "mean", title=f"{name} mean")})
                 # then log std err
+                # 绘制方差图
                 run.log(
                     {
                         f"{name}_stderr": wandb.plot.line(
@@ -708,9 +731,12 @@ def main(args):
                     }
                 )
 
+                # 计算 AUC（曲线下面积）
                 # also compute an AUC at each prefix len idx by treating the name col as the positives
                 # and the baseline_completion_retrieval_score as the negatives
                 # then log those pairs to wandb
+                # name 列为 正类（AI 生成文本的 retrieval_score）。
+                # baseline_completion_retrieval_score 作为 负类（人类文本的 retrieval_score）。
                 if name != "baseline_completion_retrieval_score":
                     pos_negs_at_T = at_T_df.groupby("prefix_length")[
                         [name, "baseline_completion_retrieval_score"]
@@ -718,6 +744,8 @@ def main(args):
                     # auc_at_T = []
                     # tpr_at_X_fpr = []
                     all_aucs, all_tpr_at_X_fpr = [], []
+
+                    # 计算ROC曲线
                     for idx, sub_df in pos_negs_at_T:
                         pos = sub_df[name]
                         neg = sub_df["baseline_completion_retrieval_score"]
@@ -731,6 +759,9 @@ def main(args):
                             pos_label=1,
                         )
                         auc = metrics.auc(fpr, tpr)
+
+                        # 计算TPR@低FPR
+                        # 低 FPR下TPR 仍然高，说明 retrieval_score 能区分 AI 生成文本
                         try:
                             tpr_at_X_fpr = tpr[np.where(fpr < 1e-3)[0][-1]]
                         except IndexError:
@@ -741,6 +772,8 @@ def main(args):
                         # run.log(data={f"{name}_auc_at_T": auc, "idx_T": idx})
                     # log this triple as a table instead like the AUC and tpr at X fpr below
                     # where the first two are plotted and the third is the x axis
+                    # 记录 AUC 变化（不同 prefix_length 下）
+                    # 记录 TPR@X FPR 变化（低 FPR 下的 TPR）。
                     data = [
                         [x, y, z] for x, (y, z) in zip(T_indices, zip(all_aucs, all_tpr_at_X_fpr))
                     ]

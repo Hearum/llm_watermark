@@ -16,8 +16,9 @@ from metrics.detect_retrieval_utils.models import load_model
 from metrics.detect_retrieval_utils.embed_sentences import embed_all
 import torch
 
-nltk.download("punkt")
+# nltk.download("punkt")
 
+# 检测文本的可检索性（Retrievability），评估它们在数据库中是否可检索，并返回相应的检索分数（retrieval_score）。
 
 def detect_retrieval(data, args=None):
     # class parser_args(dict):
@@ -40,6 +41,7 @@ def detect_retrieval(data, args=None):
     # tokenizer = AutoTokenizer.from_pretrained(args.base_model)
 
     # load SIM model
+    # 加载预训练模型用于计算文本相似度
     download_url = "http://www.cs.cmu.edu/~jwieting/paraphrase-at-scale-english.zip"
     download_dir = "./metrics/detect_retrieval_utils/"
     load_file = "./metrics/detect_retrieval_utils/model.para.lc.100.pt"
@@ -69,21 +71,26 @@ def detect_retrieval(data, args=None):
         # Delete the empty directory
         os.rmdir(os.path.join(download_dir, "paraphrase-at-scale-english"))
 
+    # 加载语义匹配模型
     sim_model = load_model(load_file)
     sim_model.eval()
+    # 封装 embed_all 作为文本嵌入模型。
     embedder = partial(embed_all, model=sim_model)
 
-    gens_list = []
-    cands = []
+    gens_list = [] # gens_list：存储 生成文本（w_wm_output）
+    cands = [] # cands：存储 三种文本（基准、攻击后、带水印）
     truncate_tokens = 10000  # args.total_tokens
 
-    gen_nones = []
+    # gen_nones、gold_nones、pp0_nones：记录 空文本索引（跳过这些数据）。
+    gen_nones = [] # 
     gold_nones = []
     pp0_nones = []
 
+    # db_col_dict：用于 构建数据库（索引）。
     db_col_dict = {}
 
     # iterate over data and tokenize each instance
+    # 分割文本
     for ds_i, dd in tqdm.tqdm(enumerate(data), total=len(data)):
         if dd[args.retrieval_db_column] is None or dd[args.retrieval_db_column] == "":
             gen_tokens = ""
@@ -107,6 +114,7 @@ def detect_retrieval(data, args=None):
         else:
             pp0_tokens = dd["w_wm_output_attacked"].split()
 
+        # 确保三种文本长度一致，去三者中的最小长度，确保对齐，然后放入cands存储文本对，在后续进行进一步计算
         # min_len = min(len(gold_tokens), len(pp0_tokens), len(gen_tokens))
         non_empty_str_lens = [
             len(toks) for toks in [gold_tokens, pp0_tokens, gen_tokens] if toks != ""
@@ -125,6 +133,7 @@ def detect_retrieval(data, args=None):
                 "ds_i": ds_i,
             }
         )
+
         # note this is our 'idx' not the iteration ds_i
         if dd["idx"] not in db_col_dict:
             db_col_dict[dd["idx"]] = []
@@ -151,6 +160,11 @@ def detect_retrieval(data, args=None):
         gens_list = new_gens_list
 
     # index the cand_gens
+    # 选择检索方法
+    '''
+    sim"（语义匹配） → 计算生成文本的嵌入向量gen_vecs。
+    "bm25"（传统检索） → 构建 BM25 索引。
+        '''
     if args.retrieval_technique == "sim":
         gen_vecs = embedder(sentences=gens_list, disable=True)
     elif args.retrieval_technique == "bm25":
@@ -163,6 +177,7 @@ def detect_retrieval(data, args=None):
     paraphrase_detect = []
     generation_detect = []
 
+    # 计算检索分数
     for cand_i, cand in tqdm.tqdm(enumerate(cands)):
         try:
             if args.retrieval_technique == "sim":

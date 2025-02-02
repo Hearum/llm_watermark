@@ -34,7 +34,7 @@ from utils.io import write_jsonlines, write_json
 
 # watermarking functionality
 from watermark_processor import WatermarkLogitsProcessor
-
+from watermark_processor_kwg import WatermarkLogitsProcessor as KWG_WatermarkLogitsProcessor
 # generation pipeline helpers
 from utils.generation import (
     MAX_GENERATIONS,
@@ -94,39 +94,7 @@ def main(args):
     ###########################################################################
 
     model, tokenizer, device = load_model(args)
-    # from transformers import AutoTokenizer, AutoModelForCausalLM
 
-    # tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
-    # model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
-    
-    # args.is_decoder_only_model = True
-    # device = "cuda" if torch.cuda.is_available() else "cpu"
-    # if args.load_fp16:
-    #     pass
-    # else:
-    #     model = model.to(device)
-    # model.eval()
-
-    # if args.is_decoder_only_model:
-    #     padding_side = "left"
-    # else:
-    #     raise NotImplementedError(
-    #         "Need to check how to handle padding for seq2seq models when calling generate"
-    #     )
-
-    # if True:
-    #     tokenizer = LlamaTokenizer.from_pretrained(
-    #         args.model_name_or_path, padding_side=padding_side
-    #     )
-    #     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
-    #     model.config.bos_token_id = 1
-    #     model.config.eos_token_id = 2
-    # else:
-    #     tokenizer = AutoTokenizer.from_pretrained(
-    #         args.model_name_or_path, padding_side=padding_side
-    #     )
-
-    # args.model_max_length = model.config.max_position_embeddings
     ###########################################################################
     # 设置和prompt有关的参数列表
     ###########################################################################
@@ -167,6 +135,12 @@ def main(args):
         max_input_len=model.config.max_position_embeddings,
         max_new_tokens=args.max_new_tokens,
     )
+    '''
+    'no_truncation' → 不截断 prompt 和 completion; 完全不截断，prompt 和 completion 都完整	适用于不想丢失输入信息
+    'completion_length' → 只限制 completion 长度; 限制 completion 长度，但 prompt 可变长	控制新生成 token 长度
+    'prompt_length' → 只限制 prompt 长度; 截断 prompt，但让 completion 生成任意长度	控制 prompt 长度，但不限制生成
+    
+    '''
     if args.input_filtering_strategy == "prompt_length":
         input_check_kwargs.update(dict(min_prompt_len=args.min_prompt_tokens, min_completion_len=0))
     elif args.input_filtering_strategy == "completion_length":
@@ -192,18 +166,31 @@ def main(args):
     ###########################################################################
     # Construct the watermark processor
     ###########################################################################
-
-    watermark_processor = WatermarkLogitsProcessor(
-        vocab=list(tokenizer.get_vocab().values()),
-        gamma=args.gamma,
-        delta=args.delta,
-        n_hashes=args.n_hashes,
-        n_features=args.n_features,
-        threshold=args.threshold,
-        seeding_scheme=args.seeding_scheme,
-        store_spike_ents=args.store_spike_ents,
-        select_green_tokens=True,
-    )
+    
+    if args.LSH:
+        watermark_processor = WatermarkLogitsProcessor(
+            vocab=list(tokenizer.get_vocab().values()),
+            prefix_len=0,
+            gamma=args.gamma,
+            delta=args.delta,
+            n_hashes=args.n_hashes,
+            n_features=args.n_features,
+            threshold=args.threshold,
+            seeding_scheme=args.seeding_scheme,
+            store_spike_ents=args.store_spike_ents,
+            select_green_tokens=True,
+        )
+    else:
+        import pdb
+        pdb.set_trace()
+        watermark_processor = KWG_WatermarkLogitsProcessor(
+            vocab=list(tokenizer.get_vocab().values()),
+            gamma=args.gamma,
+            delta=args.delta,
+            seeding_scheme=args.seeding_scheme,
+            store_spike_ents=args.store_spike_ents,
+            select_green_tokens=True,
+        )
 
     ###########################################################################
     # Configure the generation partials
@@ -211,26 +198,36 @@ def main(args):
 
     gen_kwargs = dict(max_new_tokens=args.max_new_tokens)
 
-    # FIXME can add typica
-    if args.use_sampling:
-        gen_kwargs.update(
-            dict(
-                do_sample=True,
-                top_k=args.top_k,
-                top_p=args.top_p,
-                typical_p=args.typical_p,
-                temperature=args.sampling_temp,
-            )
+    # # FIXME can add typica
+    # if args.use_sampling:
+    #     gen_kwargs.update(
+    #         dict(
+    #             do_sample=True,
+    #             top_k=args.top_k,
+    #             top_p=args.top_p,
+    #             typical_p=args.typical_p,
+    #             temperature=args.sampling_temp,
+    #         )
+    #     )
+    # else:
+    #     gen_kwargs.update(dict(num_beams=args.num_beams))
+    gen_kwargs.update(
+        dict(
+            do_sample=False,
+            num_beams=1,
+            repetition_penalty=1.2,
+            top_p=None,
+            temperature=None,
         )
-    else:
-        pass
-        #gen_kwargs.update(dict(num_beams=args.num_beams))
+        )
 
-    generate_without_watermark = partial(model_generate,model=model,tokenizer=tokenizer,**gen_kwargs)
+    generate_without_watermark = partial(model_generate,model=model,)
     generate_with_watermark = partial(
-        model_generate, model=model,tokenizer=tokenizer, logits_processor=LogitsProcessorList([watermark_processor]), **gen_kwargs
-    )
-
+        model_generate, model=model, logits_processor=watermark_processor,)
+    # generate_without_watermark = partial(model.generate, **gen_kwargs)
+    # generate_with_watermark = partial(
+    #     model.generate, logits_processor=LogitsProcessorList([watermark_processor]), **gen_kwargs
+    # )
     # construct the collator
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True, pad_to_multiple_of=8)
 
@@ -641,7 +638,11 @@ if __name__ == "__main__":
         type=float,
         default=0.2,
     )
-
+    parser.add_argument(
+        "--LSH",
+        type=str2bool,
+        default=False,
+    )
     args = parser.parse_args()
 
     ###########################################################################

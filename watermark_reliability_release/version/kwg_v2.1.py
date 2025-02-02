@@ -1,4 +1,6 @@
-
+###############
+# 改回使用generater方法生成水印了
+###############
 from __future__ import annotations
 import collections
 from math import sqrt
@@ -156,6 +158,7 @@ class WatermarkBase:
                 indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
             else:
                 indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
+
         extended_indices = torch.cat(indices)
         if extended_indices.size(0) > self.vocab_size:
             extended_indices = extended_indices[:self.vocab_size]
@@ -342,7 +345,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 pass  # do not break early
         return torch.as_tensor(final_greenlist, device=input_ids.device)
 
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> torch.FloatTensor:
         """Call with previous context as input_ids, and scores for next token."""
         # #############
         # 这里是为了测试加的prompt长度
