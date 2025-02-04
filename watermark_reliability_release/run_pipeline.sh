@@ -7,7 +7,7 @@ export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_rel
 export HF_ENDPOINT=https://hf-mirror.com
 
 OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output
-RUN_NAME=llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG
+RUN_NAME=llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_5_32_0.2_LSH_v2.1
 GENERATION_OUTPUT_DIR="$OUTPUT_DIR"/"$RUN_NAME"
 
 echo "Running generation pipeline with output dir: $GENERATION_OUTPUT_DIR"
@@ -15,7 +15,7 @@ echo "Running generation pipeline with output dir: $GENERATION_OUTPUT_DIR"
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=2
 # python generation_pipeline.py \
 #     --model_name=$LLAMA_PATH \
 #     --dataset_name=wikitext \
@@ -41,18 +41,21 @@ export CUDA_VISIBLE_DEVICES=3
 #     --LSH=True
 
 # # --attack_method=gpt \
-# python attack_pipeline.py \
-#     --attack_method=dipper \
-#     --run_name="$RUN_NAME"_dipper_attack \
-#     --wandb=True \
-#     --input_dir=$GENERATION_OUTPUT_DIR \
-#     --verbose=True
-
-python evaluation_pipeline.py \
-    --evaluation_metrics=test \
-    --run_name="$RUN_NAME"_eval \
+python attack_pipeline.py \
+    --attack_method=dipper \
+    --run_name="$RUN_NAME"_dipper_attack \
     --wandb=True \
     --input_dir=$GENERATION_OUTPUT_DIR \
-    --output_dir="$GENERATION_OUTPUT_DIR"_eval \
-    --roc_test_stat=all \
-    --overwrite_output_file=True
+    --verbose=True \
+    --order 40 \
+    --lex 40 \
+    --overwrite_output_file=True \
+    
+# python evaluation_pipeline.py \
+#     --evaluation_metrics=test \
+#     --run_name="$RUN_NAME"_eval \
+#     --wandb=True \
+#     --input_dir=$GENERATION_OUTPUT_DIR \
+#     --output_dir="$GENERATION_OUTPUT_DIR"_eval \
+#     --roc_test_stat=all \
+#     --overwrite_output_file=True

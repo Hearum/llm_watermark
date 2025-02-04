@@ -429,13 +429,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lex",
         type=int,
-        default=20,
+        default=40,
         help="Lexical diversity knob for the paraphrase attack.",
     )
     parser.add_argument(
         "--order",
         type=int,
-        default=0,
+        default=40,
         help="Order diversity knob for the paraphrase attack.",
     )
     parser.add_argument(
