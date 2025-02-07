@@ -239,13 +239,14 @@ def load_hf_dataset(args):
             }
         )
     else:
-        dataset = load_dataset(
-            dataset_name,
-            dataset_config_name,
-            split=args.dataset_split,
-            streaming=args.stream_dataset,
-        )
         if "c4" in dataset_name:
+            from datasets import load_dataset
+            dataset = load_dataset(
+                'allenai/c4', 
+                data_files='/home/shenhm/documents/downloads/c4-train.00000*-of-00512.json.gz',
+                split='train',
+                streaming=args.stream_dataset,  
+                cache_dir='/tmp/dataset_cache',)
             args.__dict__.update(
                 {
                     "truncate_input_for_prompt": True,
@@ -257,6 +258,12 @@ def load_hf_dataset(args):
                 set(args.columns_to_remove + ["text", "timestamp", "url"])
             )
         elif "pile" in dataset_name:
+            dataset = load_dataset(
+            dataset_name,
+            dataset_config_name,
+            split=args.dataset_split,
+            streaming=args.stream_dataset,
+            )
             args.__dict__.update(
                 {
                     "truncate_input_for_prompt": True,

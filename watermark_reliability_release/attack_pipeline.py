@@ -152,7 +152,7 @@ def main(args):
         print("Running GPT attack")
         import openai
 
-        openai.api_key = os.environ["OPENAI_API_KEY"]
+        openai.api_key = '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' #os.environ["OPENAI_API_KEY"]
         prompt_pool = read_json("utils/prompts.json")["prompt_pool"]
         prompt_pool = {int(k): v for k, v in prompt_pool.items()}
 

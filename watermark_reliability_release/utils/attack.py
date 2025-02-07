@@ -42,10 +42,64 @@ def scramble_attack(example, tokenizer=None, args=None):
             )
     return example
 
+from openai import OpenAI
+import openai
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 def gpt_attack(example, attack_prompt=None, args=None):
     assert attack_prompt, "Prompt must be provided for GPT attack"
+    client = OpenAI(api_key="sk-m6u0zvn57TSjyOAl59D4D8974dEa48F9999f428f26Ad146f", base_url="https://zmgpt.cc/v1")
+    gen_row = example
 
+    if args.no_wm_attack:
+        original_text = gen_row["no_wm_output"]
+    else:
+        original_text = gen_row["w_wm_output"]
+
+    attacker_query = attack_prompt + original_text
+    query_msg = {"role": "user", "content": attacker_query}
+
+    # https://github.com/openai/openai-cookbook/blob/main/examples/How_to_handle_rate_limits.ipynb
+    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(25))
+    def completion_with_backoff(model, messages, temperature, max_tokens,example):
+        try:
+            # 发送请求并获取响应
+            outputs = client.chat.completions.create(
+            model=model, messages=messages, temperature=temperature, max_tokens=max_tokens
+        )
+            attacked_text = outputs.choices[0].message.content
+            assert (
+                len(outputs.choices) == 1
+            ), "OpenAI API returned more than one response, unexpected for length inference of the output"
+            example["w_wm_output_attacked_length"] = outputs.usage.completion_tokens
+            example["w_wm_output_attacked"] = attacked_text
+            if args.verbose:
+                print(f"\nOriginal text (T={example['w_wm_output_length']}):\n{original_text}")
+                print(f"\nAttacked text (T={example['w_wm_output_attacked_length']}):\n{attacked_text}")
+            return example
+        
+        except openai.BadRequestError as e:
+            # 捕获BadRequestError并记录错误，返回一个空文本
+            print(f"BadRequestError: {e.error['message']}. Returning empty text.")
+            # 返回一个空文本结果，确保继续处理
+            example["w_wm_output_attacked_length"] = 0
+            example["w_wm_output_attacked"] = ''
+            return example
+        
+    # 调用completion_with_backoff并处理返回值
+    example = completion_with_backoff(
+        model=args.attack_model_name,
+        messages=[query_msg],
+        temperature=args.attack_temperature,
+        max_tokens=args.attack_max_tokens,
+        example=example
+    )
+
+    return example
+
+def gpt_attack1(example, attack_prompt=None, args=None):
+    assert attack_prompt, "Prompt must be provided for GPT attack"
+    client = OpenAI(api_key="sk-m6u0zvn57TSjyOAl59D4D8974dEa48F9999f428f26Ad146f", base_url="https://zmgpt.cc/v1")
     gen_row = example
 
     if args.no_wm_attack:
@@ -61,7 +115,7 @@ def gpt_attack(example, attack_prompt=None, args=None):
     # https://github.com/openai/openai-cookbook/blob/main/examples/How_to_handle_rate_limits.ipynb
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(25))
     def completion_with_backoff(model, messages, temperature, max_tokens):
-        return openai.ChatCompletion.create(
+        return client.chat.completions.create(
             model=model, messages=messages, temperature=temperature, max_tokens=max_tokens
         )
 
