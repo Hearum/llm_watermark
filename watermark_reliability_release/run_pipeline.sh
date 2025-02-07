@@ -6,8 +6,8 @@ cd /home/shenhm/documents/lm-watermarking/watermark_reliability_release
 export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_release/dataset
 export HF_ENDPOINT=https://hf-mirror.com
 
-OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/
-RUN_NAME=llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_5_32_0.2_LSH_v2.1_c4_news_500
+OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/debug
+RUN_NAME=llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_5_32_0.2_LSH_v2.2_c4_new
 
 GENERATION_OUTPUT_DIR="$OUTPUT_DIR"/"$RUN_NAME"
 
@@ -15,16 +15,19 @@ echo "Running generation pipeline with output dir: $GENERATION_OUTPUT_DIR"
 
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
-export CUDA_VISIBLE_DEVICES=3
+#     --dataset_name=c4
+# openai_humaneval
+
+export CUDA_VISIBLE_DEVICES=1
 
 python generation_pipeline.py \
     --model_name=$LLAMA_PATH \
     --dataset_name=c4 \
-    --dataset_config_name=train \
+    --dataset_config_name=wikitext-103-raw-v1  \
     --max_new_tokens=100 \
     --min_generations=500 \
     --input_truncation_strategy=prompt_length \
-    --min_prompt_tokens=50 \
+    --min_prompt_tokens=100 \
     --input_filtering_strategy=prompt_and_completion_length \
     --output_filtering_strategy=max_new_tokens \
     --seeding_scheme=selfhash \
@@ -41,16 +44,19 @@ python generation_pipeline.py \
     --generation_batch_size 1 \
     --LSH=True
 
+python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/test_script/dipper_attack.py \
+    --data_path="$GENERATION_OUTPUT_DIR""/gen_table.jsonl" \
+
 # # --attack_method=gpt \
-python attack_pipeline.py \
-    --attack_method=dipper  \
-    --run_name="$RUN_NAME"_dipper_attack \
-    --wandb=True \
-    --input_dir=$GENERATION_OUTPUT_DIR \
-    --verbose=True \
-    --order 40 \
-    --lex 40 \
-    --overwrite_output_file=True \
+# python attack_pipeline.py \
+#     --attack_method=dipper  \
+#     --run_name="$RUN_NAME"_dipper_attack \
+#     --wandb=True \
+#     --input_dir=$GENERATION_OUTPUT_DIR \
+#     --verbose=True \
+#     --order 40 \
+#     --lex 40 \
+#     --overwrite_output_file=True \
     
 # python evaluation_pipeline.py \
 #     --evaluation_metrics=test \

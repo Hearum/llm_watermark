@@ -1044,7 +1044,9 @@ def test_no_watermark_test():
     print(f"Generating with {args}")
     
     # 创建 WatermarkLogitsProcessor
-    prompt = "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing game where players take control of a military unit and take part in missions against enemy forces . Stories are told through comic book @-@ like panels with"
+    from datasets import load_dataset
+    prompt = raw_datasets = load_dataset('openai/openai_humaneval',split='test')['prompt'][0] 
+    # "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing game where players take control of a military unit and take part in missions against enemy forces . Stories are told through comic book @-@ like panels with"
     #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
     # 编码 prompt
     input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:].to(device)

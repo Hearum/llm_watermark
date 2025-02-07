@@ -281,7 +281,6 @@ def main(args):
             total_steps += 1
         except StopIteration:
             break
-
         if args.verbose:
             # log basics to stdout
             print(f"#" * 80)
