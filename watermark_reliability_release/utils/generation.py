@@ -48,7 +48,7 @@ def model_generate(model,input_ids,logits_processor=None):
         assert logits_processor.prefix_len !=0
         output_w = model.generate(
             input_ids,
-            max_new_tokens=200,
+            max_new_tokens=150,
             num_beams=1,
             do_sample=False,
             repetition_penalty=1.2,
@@ -60,7 +60,7 @@ def model_generate(model,input_ids,logits_processor=None):
     else:
         output = model.generate(
             input_ids,
-            max_new_tokens=200,
+            max_new_tokens=150,
             num_beams=1,
             do_sample=False,
             repetition_penalty=1.2,

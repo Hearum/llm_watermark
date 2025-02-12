@@ -6,11 +6,10 @@ cd /home/shenhm/documents/lm-watermarking/watermark_reliability_release
 export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_release/dataset
 export HF_ENDPOINT=https://hf-mirror.com
 
-OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/debug
-RUN_NAME=llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_5_32_0.2_LSH_v2.2_c4_new
+OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150
+RUN_NAME=llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_5_32_0.15_LSH_v2.2_c4_new
 
 GENERATION_OUTPUT_DIR="$OUTPUT_DIR"/"$RUN_NAME"
-
 echo "Running generation pipeline with output dir: $GENERATION_OUTPUT_DIR"
 
 #    --dataset_name=wikitext \
@@ -18,7 +17,7 @@ echo "Running generation pipeline with output dir: $GENERATION_OUTPUT_DIR"
 #     --dataset_name=c4
 # openai_humaneval
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 python generation_pipeline.py \
     --model_name=$LLAMA_PATH \
@@ -35,7 +34,7 @@ python generation_pipeline.py \
     --delta=5 \
     --n_hashes=5 \
     --n_features=32 \
-    --threshold=0.2 \
+    --threshold=0.15 \
     --run_name="$RUN_NAME"_gen \
     --wandb=True \
     --verbose=True \
