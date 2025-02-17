@@ -40,6 +40,18 @@ def parse_args():
         default=4.0,
         help="The test statistic threshold for the detection hypothesis test.",
     )
+    parser.add_argument(
+        "--l",
+        type=int,
+        default=60,
+        help="The test statistic threshold for the detection hypothesis test.",
+    )
+    parser.add_argument(
+        "--o",
+        type=int,
+        default=60,
+        help="The test statistic threshold for the detection hypothesis test.",
+    )
     # parser.add_argument(
     #     "--normalizers",
     #     type=Union[str, NoneType],
@@ -161,8 +173,8 @@ def update_processed_count(output_path, count):
 
 def main():
     args = parse_args()
-    lex=20
-    order=20
+    lex=args.l #20
+    order=args.o #20
     input_path = args.data_path
     output_path = os.path.splitext(input_path)[0] + f'_dipper_O{order}_L{lex}.jsonl'  # 修改输出路径
 

@@ -221,9 +221,9 @@ def main(args):
         )
         )
 
-    generate_without_watermark = partial(model_generate,model=model,)
+    generate_without_watermark = partial(model_generate,model=model,max_new_tokens=args.model_max_generation_tokens)
     generate_with_watermark = partial(
-        model_generate, model=model, logits_processor=watermark_processor,)
+        model_generate, model=model, logits_processor=watermark_processor,max_new_tokens=args.model_max_generation_tokens)
     # generate_without_watermark = partial(model.generate, **gen_kwargs)
     # generate_with_watermark = partial(
     #     model.generate, logits_processor=LogitsProcessorList([watermark_processor]), **gen_kwargs
@@ -269,6 +269,12 @@ def main(args):
     # and accumulates the result rows in a list, assumes list is "small"-ish
     # and we aren't accumulating any tensors or other memory hogging artifacts
     ###########################################################################
+
+    # 先写一个config文件下去
+    
+    gen_table_meta_path = f"{args.output_dir}/gen_table_meta.json"
+    gen_table_meta = args.__dict__
+    write_json(gen_table_meta, gen_table_meta_path, indent=4)
 
     processed_examples = []
     ds_iterator = iter(dataset_w_generations)
@@ -341,7 +347,7 @@ def main(args):
     # Generation jsonl dumping
     ###########################################################################
 
-    gen_table_meta_path = f"{args.output_dir}/gen_table_meta.json"
+
     gen_table_path = f"{args.output_dir}/gen_table.jsonl"
     safe_gen_table_path = f"{args.output_dir}/gen_table_safe.jsonl"
 
@@ -360,11 +366,11 @@ def main(args):
             )
             gen_table_path = safe_gen_table_path
 
-    gen_table_meta = args.__dict__
+    # gen_table_meta = args.__dict__
     gen_table = processed_examples
 
     write_jsonlines(gen_table, gen_table_path)
-    write_json(gen_table_meta, gen_table_meta_path, indent=4)
+    # write_json(gen_table_meta, gen_table_meta_path, indent=4)
 
     # finish the wandb run
     if args.wandb:
@@ -453,6 +459,11 @@ if __name__ == "__main__":
         type=int,
         default=100,
         help="The number of tokens to generate using the model, and the num tokens removed from real text sample",
+    )
+    parser.add_argument(
+        "--model_max_generation_tokens",
+        type=int,
+        default=150
     )
     parser.add_argument(
         "--min_prompt_tokens",

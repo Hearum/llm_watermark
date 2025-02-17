@@ -41,14 +41,14 @@ import pdb
 import torch
 
 
-def model_generate(model,input_ids,logits_processor=None):
+def model_generate(model,input_ids,logits_processor=None,max_new_tokens=150):
     prefix_len = input_ids.shape[1]
     if logits_processor is not None:
         logits_processor.prefix_len = prefix_len
         assert logits_processor.prefix_len !=0
         output_w = model.generate(
             input_ids,
-            max_new_tokens=150,
+            max_new_tokens=max_new_tokens,
             num_beams=1,
             do_sample=False,
             repetition_penalty=1.2,
@@ -60,7 +60,7 @@ def model_generate(model,input_ids,logits_processor=None):
     else:
         output = model.generate(
             input_ids,
-            max_new_tokens=150,
+            max_new_tokens=max_new_tokens,
             num_beams=1,
             do_sample=False,
             repetition_penalty=1.2,
