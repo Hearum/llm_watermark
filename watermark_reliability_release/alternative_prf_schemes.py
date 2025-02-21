@@ -21,7 +21,7 @@ def seeding_scheme_lookup(seeding_scheme: str):
         raise ValueError("Seeding scheme should be a string summarizing the procedure.")
     if seeding_scheme == "simple_1" or seeding_scheme == "lefthash":
         # Default, simple bigram hash  # alias for ff-additive_prf-1-False-15485863
-        prf_type = "additive_prf"
+        prf_type = "additive_prf" # KWG1 Lefthash
         context_width = 1
         self_salt = False
         hash_key = 15485863

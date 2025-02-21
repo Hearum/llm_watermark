@@ -441,7 +441,7 @@ class WatermarkDetector(WatermarkBase):
         self.device = device
         self.z_threshold = z_threshold
         self.rng = torch.Generator(device=self.device)
-
+        self.visual = False
         self.normalizers = []
         for normalization_strategy in normalizers:
             self.normalizers.append(normalization_strategy_lookup(normalization_strategy))
@@ -696,7 +696,6 @@ class WatermarkDetector(WatermarkBase):
                 )
             )
         green_token_count, green_token_mask = 0, []
-        
         for idx in range(self.threshold_len, len(input_ids)):
             curr_token = input_ids[idx]
             greenlist_ids = self._get_greenlist_ids(input_ids[:idx],input_ids[idx])
@@ -709,10 +708,15 @@ class WatermarkDetector(WatermarkBase):
 
         # HF-style output dictionary
         # 更新字典内容
-        print(green_token_mask)
-        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
-        print(pos)
-        print("detector inputids",input_ids)
+        # print(green_token_mask)
+        # 假设 tokenizer 已经是你所用的 tokenizer 实例
+        if self.visual:
+            pos = [
+                [value, self.tokenizer.decode([int(input_ids[index])])]  # 解码 input_ids[index]
+                for index, value in enumerate(green_token_mask) ]
+
+        # print(pos)
+        # print("detector inputids",input_ids)
 
         score_dict = dict()
         if return_num_tokens_scored:
@@ -730,8 +734,9 @@ class WatermarkDetector(WatermarkBase):
             if z_score is None:
                 z_score = self._compute_z_score(green_token_count, num_tokens_scored)
             score_dict.update(dict(p_value=self._compute_p_value(z_score)))
-        if return_green_token_mask:
-            score_dict.update(dict(green_token_mask=green_token_mask))
+        if self.visual:
+            score_dict.update(dict(green_token_mask=pos))
+        
         # if return_z_at_T:
         #     # Score z_at_T separately:
         #     sizes = torch.arange(1, len(green_unique) + 1)

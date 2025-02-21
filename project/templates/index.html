@@ -1,0 +1,1477 @@
+<!doctype html>
+<html lang="en">
+
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/echarts/map/js/world.js"></script>
+
+        <meta charset="utf-8" />
+        <title>Dashboard | Lexa - Admin & Dashboard Template</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta content="Premium Multipurpose Admin & Dashboard Template" name="description" />
+        <meta content="Themesbrand" name="author" />
+        <!-- App favicon -->
+        <link rel="shortcut icon" href="assets/images/favicon.ico">
+
+        <!-- Bootstrap Css -->
+        <link href="assets/css/bootstrap.min.css" id="bootstrap-style" rel="stylesheet" type="text/css" />
+        <!-- Icons Css -->
+        <link href="assets/css/icons.min.css" rel="stylesheet" type="text/css" />
+        <!-- App Css-->
+        <link href="assets/css/app.min.css" id="app-style" rel="stylesheet" type="text/css" />
+
+    </head>
+
+    
+    <body data-sidebar="dark">
+
+    <!-- <body data-layout="horizontal" data-topbar="colored"> -->
+
+        <!-- Begin page -->
+        <div id="layout-wrapper">
+
+            
+            <header id="page-topbar">
+                <div class="navbar-header">
+                    <div class="d-flex">
+                        <!-- LOGO -->
+                        <div class="navbar-brand-box">
+                            <a href="index.html" class="logo logo-dark">
+                                <span class="logo-sm">
+                                    <img src="assets/images/logo-sm.png" alt="" height="22">
+                                </span>
+                                <span class="logo-lg">
+                                    <img src="assets/images/logo-dark.png" alt="" height="17">
+                                </span>
+                            </a>
+
+                            <a href="index.html" class="logo logo-light">
+                                <span class="logo-sm">
+                                    <img src="assets/images/logo-sm.png" alt="" height="22">
+                                </span>
+                                <span class="logo-lg">
+                                    <img src="assets/images/logo-light.png" alt="" height="18">
+                                </span>
+                            </a>
+                        </div>
+
+                        <button type="button" class="btn btn-sm px-3 font-size-24 header-item waves-effect vertical-menu-btn">
+                            <i class="mdi mdi-menu"></i>
+                        </button>
+
+                        <div class="d-none d-sm-block">
+                            <div class="dropdown dropdown-topbar pt-3 mt-1 d-inline-block">
+                                <a class="btn btn-light dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                        Create <i class="mdi mdi-chevron-down"></i>
+                                    </a>
+
+                                <div class="dropdown-menu" aria-labelledby="dropdownMenuLink">
+                                    <a class="dropdown-item" href="#">Action</a>
+                                    <a class="dropdown-item" href="#">Another action</a>
+                                    <a class="dropdown-item" href="#">Something else here</a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="#">Separated link</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex">
+
+                        <!-- App Search-->
+                        <form class="app-search d-none d-lg-block">
+                            <div class="position-relative">
+                                <input type="text" class="form-control" placeholder="Search...">
+                                <span class="fa fa-search"></span>
+                            </div>
+                        </form>
+
+                        <div class="dropdown d-inline-block d-lg-none ml-2">
+                            <button type="button" class="btn header-item noti-icon waves-effect" id="page-header-search-dropdown"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="mdi mdi-magnify"></i>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right p-0"
+                                aria-labelledby="page-header-search-dropdown">
+                    
+                                <form class="p-3">
+                                    <div class="form-group m-0">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" placeholder="Search ..." aria-label="Recipient's username">
+                                            <div class="input-group-append">
+                                                <button class="btn btn-primary" type="submit"><i class="mdi mdi-magnify"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+
+
+                        <div class="dropdown d-none d-md-block ms-2">
+                            <button type="button" class="btn header-item waves-effect" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <img class="me-2" src="assets/images/flags/us_flag.jpg" alt="Header Language" height="16"> English <span class="mdi mdi-chevron-down"></span>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end">
+
+                                <!-- item-->
+                                <a href="javascript:void(0);" class="dropdown-item notify-item">
+                                    <img src="assets/images/flags/germany_flag.jpg" alt="user-image" class="me-1" height="12"> <span class="align-middle"> German </span>
+                                </a>
+
+                                <!-- item-->
+                                <a href="javascript:void(0);" class="dropdown-item notify-item">
+                                    <img src="assets/images/flags/italy_flag.jpg" alt="user-image" class="me-1" height="12"> <span class="align-middle"> Italian </span>
+                                </a>
+
+                                <!-- item-->
+                                <a href="javascript:void(0);" class="dropdown-item notify-item">
+                                    <img src="assets/images/flags/french_flag.jpg" alt="user-image" class="me-1" height="12"> <span class="align-middle"> French </span>
+                                </a>
+
+                                <!-- item-->
+                                <a href="javascript:void(0);" class="dropdown-item notify-item">
+                                    <img src="assets/images/flags/spain_flag.jpg" alt="user-image" class="me-1" height="12"> <span class="align-middle"> Spanish </span>
+                                </a>
+
+                                <!-- item-->
+                                <a href="javascript:void(0);" class="dropdown-item notify-item">
+                                    <img src="assets/images/flags/russia_flag.jpg" alt="user-image" class="me-1" height="12"> <span class="align-middle"> Russian </span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="dropdown d-none d-lg-inline-block">
+                            <button type="button" class="btn header-item noti-icon waves-effect" data-toggle="fullscreen">
+                                <i class="mdi mdi-fullscreen font-size-24"></i>
+                            </button>
+                        </div>
+
+                        <div class="dropdown d-inline-block ms-1">
+                            <button type="button" class="btn header-item noti-icon waves-effect" id="page-header-notifications-dropdown"
+                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="ti-bell"></i>
+                                <span class="badge bg-danger rounded-pill">3</span>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end p-0"
+                                aria-labelledby="page-header-notifications-dropdown">
+                                <div class="p-3">
+                                    <div class="row align-items-center">
+                                        <div class="col">
+                                            <h5 class="m-0"> Notifications (258) </h5>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div data-simplebar style="max-height: 230px;">
+                                    <a href="" class="text-reset notification-item">
+                                        <div class="media">
+                                            <div class="avatar-xs me-3">
+                                                <span class="avatar-title border-success rounded-circle ">
+                                                    <i class="mdi mdi-cart-outline"></i>
+                                                </span>
+                                            </div>
+                                            <div class="media-body">
+                                                <h6 class="mt-0 mb-1">Your order is placed</h6>
+                                                <div class="text-muted">
+                                                    <p class="mb-1">If several languages coalesce the grammar</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </a>
+
+                                    <a href="" class="text-reset notification-item">
+                                        <div class="media">
+                                            <div class="avatar-xs me-3">
+                                                <span class="avatar-title border-warning rounded-circle ">
+                                                    <i class="mdi mdi-message"></i>
+                                                </span>
+                                            </div>
+                                            <div class="media-body">
+                                                <h6 class="mt-0 mb-1">New Message received</h6>
+                                                <div class="text-muted">
+                                                    <p class="mb-1">You have 87 unread messages</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </a>
+
+                                    <a href="" class="text-reset notification-item">
+                                        <div class="media">
+                                            <div class="avatar-xs me-3">
+                                                <span class="avatar-title border-info rounded-circle ">
+                                                    <i class="mdi mdi-glass-cocktail"></i>
+                                                </span>
+                                            </div>
+                                            <div class="media-body">
+                                                <h6 class="mt-0 mb-1">Your item is shipped</h6>
+                                                <div class="text-muted">
+                                                    <p class="mb-1">It is a long established fact that a reader will</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </a>
+
+                                    <a href="" class="text-reset notification-item">
+                                        <div class="media">
+                                            <div class="avatar-xs me-3">
+                                                <span class="avatar-title border-primary rounded-circle ">
+                                                    <i class="mdi mdi-cart-outline"></i>
+                                                </span>
+                                            </div>
+                                            <div class="media-body">
+                                                <h6 class="mt-0 mb-1">Your order is placed</h6>
+                                                <div class="text-muted">
+                                                    <p class="mb-1">Dummy text of the printing and typesetting industry.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </a>
+
+                                    <a href="" class="text-reset notification-item">
+                                        <div class="media">
+                                            <div class="avatar-xs me-3">
+                                                <span class="avatar-title border-warning rounded-circle ">
+                                                    <i class="mdi mdi-message"></i>
+                                                </span>
+                                            </div>
+                                            <div class="media-body">
+                                                <h6 class="mt-0 mb-1">New Message received</h6>
+                                                <div class="text-muted">
+                                                    <p class="mb-1">You have 87 unread messages</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </div>
+                                <div class="p-2 border-top">
+                                    <a class="btn btn-sm btn-link font-size-14 w-100 text-center" href="javascript:void(0)">
+                                        View all
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+            
+
+                        <div class="dropdown d-inline-block">
+                            <button type="button" class="btn header-item waves-effect" id="page-header-user-dropdown"
+                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <img class="rounded-circle header-profile-user" src="assets/images/users/user-4.jpg"
+                                    alt="Header Avatar">
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end">
+                                <!-- item-->
+                                <a class="dropdown-item" href="pages-lock-screen.html"><i class="mdi mdi-lock-open-outline font-size-17 text-muted align-middle me-1"></i> Lock screen</a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item text-danger" href="pages-login.html"><i class="mdi mdi-power font-size-17 text-muted align-middle me-1 text-danger"></i> Logout</a>
+                            </div>
+                        </div>
+            
+
+         
+
+
+                        <div class="dropdown d-inline-block">
+                            <button type="button" class="btn header-item noti-icon right-bar-toggle waves-effect">
+                                <i class="mdi mdi-spin mdi-cog"></i>
+                            </button>
+                        </div>
+
+         
+                    </div>
+                </div>
+            </header>
+            <!-- ========== Left Sidebar Start ========== -->
+            <div class="vertical-menu">
+
+                <div data-simplebar class="h-100">
+
+                    <!--- Sidemenu -->
+                    <div id="sidebar-menu">
+                        <!-- Left Menu Start -->
+                        <ul class="metismenu list-unstyled" id="side-menu">
+                            <li class="menu-title">Main</li>
+
+                            <li>
+                                <a href="watermark_generation.html" class="waves-effect">
+                                    <i class="mdi mdi-view-dashboard"></i>
+                                    <span class="badge rounded-pill bg-primary float-end">2</span>
+                                    <span>水印生成</span>
+                                </a>
+                            </li>
+
+                            <li>
+                                <a href="watermark_detection.html" class=" waves-effect">
+                                    <i class="mdi mdi-calendar-check"></i>
+                                    <span>水印检测</span>
+                                </a>
+                            </li>
+
+                            <!-- <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-email-outline"></i>
+                                    <span>Email</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="email-inbox.html">Inbox</a></li>
+                                    <li><a href="email-read.html">Email Read</a></li>
+                                    <li><a href="email-compose.html">Email Compose</a></li>
+                                </ul>
+                            </li> -->
+
+                            <!-- <li class="menu-title">Components</li>
+
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-buffer"></i>
+                                    <span>UI Elements</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="ui-alerts.html">Alerts</a></li>
+                                        <li><a href="ui-buttons.html">Buttons</a></li>
+                                        <li><a href="ui-badge.html">Badge</a></li>
+                                        <li><a href="ui-cards.html">Cards</a></li>
+                                        <li><a href="ui-carousel.html">Carousel</a></li>
+                                        <li><a href="ui-dropdowns.html">Dropdowns</a></li>
+                                        <li><a href="ui-grid.html">Grid</a></li>
+                                        <li><a href="ui-images.html">Images</a></li>
+                                        <li><a href="ui-lightbox.html">Lightbox</a></li>
+                                        <li><a href="ui-modals.html">Modals</a></li>
+                                        <li><a href="ui-pagination.html">Pagination</a></li>
+                                        <li><a href="ui-popover-tooltips.html">Popover &amp; Tooltips</a></li>
+                                        <li><a href="ui-rangeslider.html">Range Slider</a></li>
+                                        <li><a href="ui-session-timeout.html">Session Timeout</a></li>
+                                        <li><a href="ui-progressbars.html">Progress Bars</a></li>
+                                        <li><a href="ui-sweet-alert.html">Sweet-Alert</a></li>
+                                        <li><a href="ui-tabs-accordions.html">Tabs &amp; Accordions</a></li>
+                                        <li><a href="ui-typography.html">Typography</a></li>
+                                        <li><a href="ui-video.html">Video</a></li>
+                                </ul>
+                            </li> -->
+
+                            <!-- <li>
+                                <a href="javascript: void(0);" class="waves-effect">
+                                    <i class="mdi mdi-clipboard-outline"></i>
+                                    <span class="badge rounded-pill bg-success float-end">6</span>
+                                    <span>Forms</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="form-elements.html">Form Elements</a></li>
+                                    <li><a href="form-validation.html">Form Validation</a></li>
+                                    <li><a href="form-advanced.html">Form Advanced</a></li>
+                                    <li><a href="form-editors.html">Form Editors</a></li>
+                                    <li><a href="form-uploads.html">Form File Upload</a></li>
+                                    <li><a href="form-xeditable.html">Form Xeditable</a></li>
+                                </ul>
+                            </li> -->
+
+                            <!-- <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-chart-line"></i>
+                                    <span>Charts</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="charts-morris.html">Morris Chart</a></li>
+                                    <li><a href="charts-chartist.html">Chartist Chart</a></li>
+                                    <li><a href="charts-chartjs.html">Chartjs Chart</a></li>
+                                    <li><a href="charts-flot.html">Flot Chart</a></li>
+                                    <li><a href="charts-c3.html">C3 Chart</a></li>
+                                    <li><a href="charts-other.html">Jquery Knob Chart</a></li>
+                                </ul>
+                            </li>
+
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-format-list-bulleted-type"></i>
+                                    <span>Tables</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="tables-basic.html">Basic Tables</a></li>
+                                    <li><a href="tables-datatable.html">Data Table</a></li>
+                                    <li><a href="tables-responsive.html">Responsive Table</a></li>
+                                    <li><a href="tables-editable.html">Editable Table</a></li>
+                                </ul>
+                            </li>
+
+               
+
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-album"></i>
+                                    <span>Icons</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="icons-material.html">Material Design</a></li>
+                                    <li><a href="icons-ion.html">Ion Icons</a></li>
+                                    <li><a href="icons-fontawesome.html">Font Awesome</a></li>
+                                    <li><a href="icons-themify.html">Themify Icons</a></li>
+                                    <li><a href="icons-dripicons.html">Dripicons</a></li>
+                                    <li><a href="icons-typicons.html">Typicons Icons</a></li>
+                                </ul>
+                            </li>
+
+                            <li>
+                                <a href="javascript: void(0);" class="waves-effect">
+                                    <span class="badge rounded-pill bg-danger float-end">2</span>
+                                    <i class="mdi mdi-google-maps"></i>
+                                    <span>Maps</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="maps-google.html"> Google Map</a></li>
+                                    <li><a href="maps-vector.html"> Vector Map</a></li>
+                                </ul>
+                            </li>
+
+                            <li class="menu-title">Extras</li>
+
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-responsive"></i>
+                                    <span> Layouts </span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="true">
+                                    <li>
+                                        <a href="javascript: void(0);" class="has-arrow">Vertical</a>
+                                        <ul class="sub-menu" aria-expanded="true">
+                                            <li><a href="layouts-light-sidebar.html">Light Sidebar</a></li>
+                                            <li><a href="layouts-compact-sidebar.html">Compact Sidebar</a></li>
+                                            <li><a href="layouts-icon-sidebar.html">Icon Sidebar</a></li>
+                                            <li><a href="layouts-boxed.html">Boxed Layout</a></li>
+                                            <li><a href="layouts-preloader.html">Preloader</a></li>
+                                            <li><a href="layouts-colored-sidebar.html">Colored Sidebar</a></li>
+                                        </ul>
+                                    </li>
+
+                                    <li>
+                                        <a href="javascript: void(0);" class="has-arrow">Horizontal</a>
+                                        <ul class="sub-menu" aria-expanded="true">
+                                            <li><a href="layouts-horizontal.html">Horizontal</a></li>
+                                            <li><a href="layouts-hori-topbar-dark.html">Topbar Dark</a></li>
+                                            <li><a href="layouts-hori-preloader.html">Preloader</a></li>
+                                            <li><a href="layouts-hori-boxed-width.html">Boxed Layout</a></li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </li>
+
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-account-box"></i>
+                                    <span> Authentication </span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="pages-login.html">Login</a></li>
+                                    <li><a href="pages-register.html">Register</a></li>
+                                    <li><a href="pages-recoverpw.html">Recover Password</a></li>
+                                    <li><a href="pages-lock-screen.html">Lock Screen</a></li>
+                                </ul>
+                            </li>
+
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-text-box-multiple-outline"></i>
+                                    <span> Extra Pages </span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="pages-timeline.html">Timeline</a></li>
+                                    <li><a href="pages-invoice.html">Invoice</a></li>
+                                    <li><a href="pages-directory.html">Directory</a></li>
+                                    <li><a href="pages-blank.html">Blank Page</a></li>
+                                    <li><a href="pages-404.html">Error 404</a></li>
+                                    <li><a href="pages-500.html">Error 500</a></li>
+                                </ul>
+                            </li> -->
+
+                
+
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow waves-effect">
+                                    <i class="mdi mdi-share-variant"></i>
+                                    <span>Multi Level</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="true">
+                                    <li><a href="javascript: void(0);">Level 1.1</a></li>
+                                    <li><a href="javascript: void(0);" class="has-arrow">Level 1.2</a>
+                                        <ul class="sub-menu" aria-expanded="true">
+                                            <li><a href="javascript: void(0);">Level 2.1</a></li>
+                                            <li><a href="javascript: void(0);">Level 2.2</a></li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </li>
+
+                        </ul>
+                    </div>
+                    <!-- Sidebar -->
+                </div>
+            </div>
+            <!-- Left Sidebar End -->
+
+            
+
+            <!-- ============================================================== -->
+            <!-- Start right Content here -->
+            <!-- ============================================================== -->
+            <div class="main-content">
+                <div class="page-content">
+                    <div class="container-fluid">
+                        <!-- 顶部统计指标 -->
+                        <div class="row">
+                            <div class="col-xl-3 col-sm-6">
+                                <div class="card mini-stat bg-primary">
+                                    <div class="card-body mini-stat-img">
+                                        <div class="mini-stat-icon">
+                                            <i class="mdi mdi-cube-outline float-end"></i>
+                                        </div>
+                                        <div class="text-white">
+                                            <h6 class="text-uppercase mb-3 font-size-18 text-white">当日请求次数</h6>
+                                            <h2 class="mb-4 text-white">18,587</h2>
+                                            <span class="badge bg-info"> +11% </span> <span class="ms-2">From previous period</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xl-3 col-sm-6">
+                                <div class="card mini-stat bg-primary">
+                                    <div class="card-body mini-stat-img">
+                                        <div class="mini-stat-icon">
+                                            <i class="mdi mdi-buffer float-end"></i>
+                                        </div>
+                                        <div class="text-white">
+                                            <h6 class="text-uppercase mb-3 font-size-18 text-white">当日拦截次数</h6>
+                                            <h2 class="mb-4 text-white">11,782</h2>
+                                            <span class="badge bg-danger"> -29% </span> <span class="ms-2">From previous period</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xl-3 col-sm-6">
+                                <div class="card mini-stat bg-primary">
+                                    <div class="card-body mini-stat-img">
+                                        <div class="mini-stat-icon">
+                                            <i class="mdi mdi-tag-text-outline float-end"></i>
+                                        </div>
+                                        <div class="text-white">
+                                            <h6 class="text-uppercase mb-3 font-size-18 text-white">独立IP访问次数</h6>
+                                            <h2 class="mb-4 text-white">1,538</h2>
+                                            <span class="badge bg-warning"> 0% </span> <span class="ms-2">From previous period</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xl-3 col-sm-6">
+                                <div class="card mini-stat bg-primary">
+                                    <div class="card-body mini-stat-img">
+                                        <div class="mini-stat-icon">
+                                            <i class="mdi mdi-briefcase-check float-end"></i>
+                                        </div>
+                                        <div class="text-white">
+                                            <h6 class="text-uppercase mb-3 font-size-18 text-white">攻击IP访问次数</h6>
+                                            <h2 class="mb-4 text-white">1,890</h2>
+                                            <span class="badge bg-info"> +89% </span> <span class="ms-2">From previous period</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-2">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5>历史总访问次数</h5>
+                                        <h2 id="total-visits">33.3k</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5>恶意请求占比</h5>
+                                        <h2 id="unique-visitors">43.22%</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5>2xx状态码数量</h5>
+                                        <h2 id="unique-ips">302</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5>3xx状态码数量</h5>
+                                        <h2 id="block-count">1440</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5>4xx状态码数量</h5>
+                                        <h2 id="attack-ip-count">246</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5>5xx状态码数量</h5>
+                                        <h2 id="4xx-error-rate">428</h2>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <!-- end row -->
+                        <!-- 地理位置与分布 --> 
+                        <div class="row mt-4">
+                            <div class="col-md-8">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4>地理位置</h4>
+                                        <div id="geo-map" style="height: 400px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4>请求来源排名</h4>
+                                        <div id="geo-ranking" style="height: 400px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <script>
+                            // 地理位置数据
+                            var geoData = [
+                                { name: 'China', value: 195 },
+                                { name: 'United States', value: 110 },
+                                { name: 'United Kingdom', value: 8 },
+                                { name: 'Ireland', value: 7 },
+                                { name: 'Singapore', value: 5 },
+                                { name: 'Japan', value: 5 },
+                                { name: 'Russia', value: 4 },
+                                { name: 'Germany', value: 15 },
+                                { name: 'France', value: 12 },
+                                { name: 'India', value: 20 },
+                                { name: 'Brazil', value: 10 },
+                                { name: 'South Korea', value: 6 },
+                                { name: 'Australia', value: 9 },
+                                { name: 'Canada', value: 11 },
+                                { name: 'Mexico', value: 8 },
+                                { name: 'South Africa', value: 3 },
+                                { name: 'Italy', value: 7 },
+                                { name: 'Spain', value: 5 },
+                                { name: 'Netherlands', value: 4 },
+                                { name: 'Saudi Arabia', value: 6 },
+                                { name: 'Turkey', value: 7 },
+                                { name: 'Sweden', value: 3 },
+                                { name: 'Norway', value: 2 },
+                                { name: 'Switzerland', value: 4 },
+                                { name: 'Thailand', value: 6 },
+                                { name: 'Indonesia', value: 12 },
+                                { name: 'Pakistan', value: 5 },
+                                { name: 'Malaysia', value: 8 },
+                                { name: 'Philippines', value: 7 },
+                                { name: 'Vietnam', value: 6 },
+                                { name: 'Egypt', value: 5 },
+                                { name: 'Nigeria', value: 4 },
+                                { name: 'Argentina', value: 4 },
+                                { name: 'Chile', value: 3 },
+                                { name: 'Colombia', value: 6 },
+                                { name: 'Belgium', value: 5 },
+                                { name: 'Denmark', value: 3 },
+                                { name: 'Austria', value: 4 },
+                                { name: 'New Zealand', value: 3 },
+                                { name: 'Poland', value: 7 },
+                                { name: 'Ukraine', value: 2 },
+                                { name: 'Bangladesh', value: 4 },
+                                { name: 'Israel', value: 6 },
+                                { name: 'Finland', value: 3 },
+                                { name: 'Portugal', value: 3 },
+                                { name: 'Greece', value: 3 },
+                                { name: 'Czech Republic', value: 2 },
+                                { name: 'Hungary', value: 2 },
+                                { name: 'Romania', value: 2 },
+                                { name: 'Kazakhstan', value: 1 },
+                                { name: 'Uzbekistan', value: 1 },
+                                { name: 'Morocco', value: 1 },
+                                { name: 'Algeria', value: 1 },
+                                { name: 'Peru', value: 2 },
+                                { name: 'Venezuela', value: 1 },
+                                { name: 'Ecuador', value: 1 },
+                                { name: 'Cuba', value: 1 },
+                                { name: 'Bolivia', value: 1 },
+                                { name: 'Paraguay', value: 1 }
+                            ];
+
+                            // 地理位置世界地图
+                            var geoMapChart = echarts.init(document.getElementById('geo-map'));
+                            geoMapChart.setOption({
+                                tooltip: {
+                                    trigger: 'item',
+                                    formatter: '{b}: {c}'
+                                },
+                                visualMap: {
+                                    min: 0,
+                                    max: 200,
+                                    left: 'left',
+                                    bottom: '5%',
+                                    text: ['高', '低'],
+                                    calculable: true,
+                                    inRange: {
+                                        color: ['#E3F2FD', '#90CAF9', '#42A5F5', '#1E88E5', '#1565C0', '#311B92']
+                                    },
+                                    textStyle: {
+                                        color: '#fff'
+                                    }
+                                },
+                                geo: {
+                                    map: 'world',
+                                    roam: true,
+                                    label: {
+                                        emphasis: {
+                                            show: false
+                                        }
+                                    },
+                                    itemStyle: {
+                                        normal: {
+                                            areaColor: '#323c48',
+                                            borderColor: '#111'
+                                        },
+                                        emphasis: {
+                                            areaColor: '#2a333d'
+                                        }
+                                    }
+                                },
+                                series: [
+                                    {
+                                        name: '访问量',
+                                        type: 'map',
+                                        map: 'world',
+                                        geoIndex: 0,
+                                        data: geoData
+                                    }
+                                ]
+                            });
+
+                            // 获取前八名的排名数据
+                            var top8Data = geoData.sort((a, b) => b.value - a.value).slice(0, 8);
+                            var top8Names = top8Data.map(item => item.name);
+                            var top8Values = top8Data.map(item => item.value);
+
+                            // 请求来源排名条形图
+                            var geoRankingChart = echarts.init(document.getElementById('geo-ranking'));
+                            geoRankingChart.setOption({
+                            title: { 
+                                text: '来源地排名', 
+                                left: 'center', 
+                                textStyle: { color: '#ffffff' } 
+                            },
+                            tooltip: { 
+                                trigger: 'axis',
+                                formatter: '{b}: {c}' // 悬浮时显示国家名字和数值
+                            },
+                            xAxis: {
+                                type: 'value',
+                                axisLine: { lineStyle: { color: '#ffffff' } },
+                                axisLabel: { color: '#ffffff' },
+                                splitLine: { show: false }  // 隐藏分割线
+                            },
+                            yAxis: {
+                                type: 'category',
+                                data: top8Names,  // 国家名称列表
+                                axisLine: { show: false },  // 隐藏y轴线
+                                axisTick: { show: false },  // 隐藏刻度线
+                                axisLabel: {
+                                    color: '#ffffff',
+                                    formatter: function(value, index) {
+                                        // 通过formatter在上面显示国家名称
+                                        return `{name|${value}}\n{value|${top8Values[index]}k}`;
+                                    },
+                                    rich: {
+                                        name: { color: '#ffffff', align: 'left' },
+                                        value: { color: '#ffffff', align: 'right', padding: [0, 10, 0, 0] }
+                                    }
+                                }
+                            },
+                            series: [{
+                                type: 'bar',
+                                data: top8Values,  // 对应的数值
+                                itemStyle: {
+                                    color: '#42A5F5' // 恢复原来的颜色
+                                },
+                                barWidth: '60%', // 控制条形图的宽度
+                                label: {
+                                    show: false // 隐藏内部的数值显示，只在右侧显示数值
+                                }
+                            }]
+                        });
+
+                        </script>
+
+
+                        <!-- 访问与拦截趋势 -->
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4>访问情况</h4>
+                                        <div id="visit-trend" style="height: 200px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4>拦截情况</h4>
+                                        <div id="block-trend" style="height: 200px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        // 30天访问情况
+                        var visitTrendChart = echarts.init(document.getElementById('visit-trend'));
+                        visitTrendChart.setOption({
+                            title: {
+                                text: '30天访问情况',
+                                left: 'center',
+                                textStyle: {
+                                    color: '#ffffff'
+                                }
+                            },
+                            tooltip: {
+                                trigger: 'axis',
+                            },
+                            xAxis: {
+                                type: 'category',
+                                data: Array.from({length: 30}, (_, i) => `Day ${i + 1}`), // 使用 Day 1, Day 2, ..., Day 30
+                                axisLine: { lineStyle: { color: '#ffffff' } },
+                                axisLabel: { color: '#ffffff' }
+                            },
+                            yAxis: {
+                                type: 'value',
+                                axisLine: { lineStyle: { color: '#ffffff' } },
+                                axisLabel: { color: '#ffffff' }
+                            },
+                            series: [{
+                                type: 'bar',
+                                data: [120, 200, 150, 80, 70, 110, 130, 90, 240, 180, 75, 60, 90, 140, 115, 95, 130, 120, 145, 80, 110, 160, 140, 60, 90, 120, 150, 160, 140, 130], // 示例数据
+                                itemStyle: {
+                                    color: '#FFC107' // 与图片左侧的颜色相似
+                                },
+                                barWidth: '60%'
+                            }]
+                        });
+                    
+                        // 30天拦截情况
+                        var blockTrendChart = echarts.init(document.getElementById('block-trend'));
+                        blockTrendChart.setOption({
+                            title: {
+                                text: '30天拦截情况',
+                                left: 'center',
+                                textStyle: {
+                                    color: '#ffffff'
+                                }
+                            },
+                            tooltip: {
+                                trigger: 'axis',
+                            },
+                            xAxis: {
+                                type: 'category',
+                                data: Array.from({length: 30}, (_, i) => `Day ${i + 1}`),
+                                axisLine: { lineStyle: { color: '#ffffff' } },
+                                axisLabel: { color: '#ffffff' }
+                            },
+                            yAxis: {
+                                type: 'value',
+                                axisLine: { lineStyle: { color: '#ffffff' } },
+                                axisLabel: { color: '#ffffff' }
+                            },
+                            series: [{
+                                type: 'bar',
+                                data: [80, 150, 100, 50, 60, 90, 110, 130, 160, 140, 65, 70, 110, 160, 125, 85, 120, 110, 135, 60, 100, 120, 130, 80, 100, 140, 160, 140, 120, 110], // 示例数据
+                                itemStyle: {
+                                    color: '#FF5722' // 与图片右侧的颜色相似
+                                },
+                                barWidth: '60%'
+                            }]
+                        });
+                    </script>
+
+
+                        <div class="row">
+                            <div class="col-xl-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4 class="card-title mb-4">客户端统计</h2> 
+
+                                        <div class="row text-center mt-4">
+                                            <div class="col-6">
+                                                
+                                                <h5 class="font-size-20">#5,621</h2>
+                                                <p class="text-muted">Total number of requests</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <h5 class="font-size-20">#235</h2>
+                                                <p class="text-muted">High-risk requests</p>
+                                            </div>
+                                        </div>
+
+                                        <div id="morris-donut-example" class="morris-charts morris-charts-height" dir="ltr"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-xl-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4 class="card-title mb-4">访问和拦截数据可视化</h4>
+
+                                        <div class="row text-center mt-4">
+                                            <div class="col-4">
+                                                <h5 class="font-size-20"> 89,425</h5>
+                                                <p class="text-muted">历史总访问数据</p>
+                                            </div>
+                                            <div class="col-4">
+                                                <h5 class="font-size-20"> 18,210</h5>
+                                                <p class="text-muted">当日访问数据</p>
+                                            </div>
+                                            <div class="col-4">
+                                                <h5 class="font-size-20"> 56,974</h5>
+                                                <p class="text-muted">本月访问数据</p>
+                                            </div>
+                                        </div>
+
+                                        <div id="morris-area-example" class="morris-charts morris-charts-height" dir="ltr"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-xl-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4 class="card-title mb-4">流量统计</h4>
+
+                                        <div class="row text-center mt-4">
+                                            <div class="col-6">
+                                                <h5 class="font-size-20">2,548</h5>
+                                                <p class="text-muted">今日拦截流量</p>
+                                            </div>
+                                            <div class="col-6">
+                                                <h5 class="font-size-20">6,985</h5>
+                                                <p class="text-muted">今日放行流量</p>
+                                            </div>
+                                        </div>
+
+                                        <div id="morris-bar-stacked" class="morris-charts morris-charts-height" dir="ltr"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                        <!-- end row -->
+                        <div class="row">
+                            <!-- 第一个折线图 -->
+                            <div class="col-lg-6">
+                              <div class="card">
+                                <div class="card-body">
+                                  <h4 class="card-title mb-4">统计攻击趋势（日）</h4>
+                                  <div class="row text-center mt-4">
+                                    <div class="col-4">
+                                      <h5 class="mb-0 font-size-20 text-truncate">25610</h5>
+                                      <p class="text-muted text-truncate">Activated</p>
+                                    </div>
+                                    <div class="col-4">
+                                      <h5 class="mb-0 font-size-20 text-truncate">56210</h5>
+                                      <p class="text-muted text-truncate">Pending</p>
+                                    </div>
+                                    <div class="col-4">
+                                      <h5 class="mb-0 font-size-20 text-truncate">12485</h5>
+                                      <p class="text-muted text-truncate">Deactivated</p>
+                                    </div>
+                                  </div>
+                                  <div id="morris-line-example" class="morris-charts morris-charts-height" dir="ltr"></div>
+                                </div>
+                              </div>
+                            </div>
+                          
+                            <!-- 第二个折线图 -->
+                            <div class="col-lg-6">
+                              <div class="card">
+                                <div class="card-body">
+                                  <h4 class="card-title mb-4">统计攻击趋势（月）</h4>
+                                  <div class="row text-center mt-4">
+                                    <div class="col-4">
+                                      <h5 class="mb-0 font-size-20 text-truncate">30500</h5>
+                                      <p class="text-muted text-truncate">Activated</p>
+                                    </div>
+                                    <div class="col-4">
+                                      <h5 class="mb-0 font-size-20 text-truncate">41200</h5>
+                                      <p class="text-muted text-truncate">Pending</p>
+                                    </div>
+                                    <div class="col-4">
+                                      <h5 class="mb-0 font-size-20 text-truncate">15025</h5>
+                                      <p class="text-muted text-truncate">Deactivated</p>
+                                    </div>
+                                  </div>
+                                  <div id="morris-line-example-2" class="morris-charts morris-charts-height" dir="ltr"></div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                    <div class="row mt-4">
+                        <!-- 客户端 -->
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h4 class="card-title">客户端</h4>
+                                    <div class="d-flex">
+                                        <!-- 客户端环形图 -->
+                                        <div id="client-chart" style="width: 50%; height: 200px;"></div>
+                                        <!-- 客户端数据列表 -->
+                                        <div class="ms-3">
+                                            <p><span style="color: #FF7043;">●</span> macOS <span class="float-end">1.6k</span></p>
+                                            <p><span style="color: #29B6F6;">●</span> Windows <span class="float-end">1.4k</span></p>
+                                            <p><span style="color: #AB47BC;">●</span> Android <span class="float-end">90</span></p>
+                                            <p><span style="color: #66BB6A;">●</span> Linux <span class="float-end">65</span></p>
+                                            <p><span style="color: #FFCA28;">●</span> iOS <span class="float-end">3</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <!-- 响应状态 -->
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h4 class="card-title">响应状态</h4>
+                                    <div class="d-flex">
+                                        <!-- 响应状态环形图 -->
+                                        <div id="status-chart" style="width: 50%; height: 200px;"></div>
+                                        <!-- 响应状态数据列表 -->
+                                        <div class="ms-3">
+                                            <p><span style="color: #FF7043;">●</span> 200 <span>203</span></p>
+                                            <p><span style="color: #29B6F6;">●</span> 206 <span>602</span></p>
+                                            <p><span style="color: #AB47BC;">●</span> 404 <span>307</span></p>
+                                            <p><span style="color: #66BB6A;">●</span> 403 <span>307</span></p>
+                                            <p><span style="color: #FFCA28;">●</span> 466 <span>59</span></p>
+                                        </div>                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <script>
+                    window.onload = function() {
+                        // 客户端环形图
+                        var clientChart = echarts.init(document.getElementById('client-chart'));
+                        clientChart.setOption({
+                            series: [
+                                {
+                                    type: 'pie',
+                                    radius: ['40%', '70%'],
+                                    avoidLabelOverlap: false,
+                                    label: { show: false },
+                                    labelLine: { show: false },
+                                    data: [
+                                        { value: 1600, name: 'macOS', itemStyle: { color: '#FF7043' } },
+                                        { value: 1400, name: 'Windows', itemStyle: { color: '#29B6F6' } },
+                                        { value: 90, name: 'Android', itemStyle: { color: '#AB47BC' } },
+                                        { value: 65, name: 'Linux', itemStyle: { color: '#66BB6A' } },
+                                        { value: 3, name: 'iOS', itemStyle: { color: '#FFCA28' } },
+                                    ]
+                                }
+                            ]
+                        });
+
+                        // 响应状态环形图
+                        var statusChart = echarts.init(document.getElementById('status-chart'));
+                        statusChart.setOption({
+                            series: [
+                                {
+                                    type: 'pie',
+                                    radius: ['40%', '70%'],
+                                    avoidLabelOverlap: false,
+                                    label: { show: false },
+                                    labelLine: { show: false },
+                                    data: [
+                                        { value: 2000, name: '200', itemStyle: { color: '#FF7043' } },
+                                        { value: 602, name: '206', itemStyle: { color: '#29B6F6' } },
+                                        { value: 307, name: '404', itemStyle: { color: '#AB47BC' } },
+                                        { value: 307, name: '403', itemStyle: { color: '#66BB6A' } },
+                                        { value: 59, name: '466', itemStyle: { color: '#FFCA28' } },
+                                    ]
+                                }
+                            ]
+                        });
+                    };
+                    </script>  
+  
+                        <!-- start page title -->
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <div class="page-title-box">
+                                    <h3>防护拦截日志</h3>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="state-information d-none d-sm-block">
+                                    <div class="state-graph">
+                                        <div id="header-chart-1"></div>
+                                        <div class="info">Balance $ 2,317</div>
+                                    </div>
+                                    <div class="state-graph">
+                                        <div id="header-chart-2"></div>
+                                        <div class="info">Item Sold 1230</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- end page title -->
+
+                        <div class="table-rep-plugin">
+                            <div class="table-responsive mb-0" data-pattern="priority-columns">
+                                <table id="tech-companies-1" class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>源 IP</th>
+                                            <th data-priority="1">用户代理</th>
+                                            <th data-priority="3">时间</th>
+                                            <th data-priority="1">动作</th>
+                                            <th data-priority="3">响应状态</th>
+                                            <th data-priority="3">触发拦截规则</th>
+                                            <th data-priority="6">攻击类型</th>
+                                            <th data-priority="6">威胁等级</th>
+                                            <th data-priority="6">处理状态</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>192.168.1.101</td>
+                                            <td>Mozilla/5.0 (Windows NT 10.0; Win64; x64)</td>
+                                            <td>2024-11-08 14:35:21</td>
+                                            <td>阻止</td>
+                                            <td>403 Forbidden</td>
+                                            <td>SQL注入检测 Rule7012</td>
+                                            <td>SQL注入</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>203.0.113.56</td>
+                                            <td>curl/7.68.0</td>
+                                            <td>2024-11-08 15:22:10</td>
+                                            <td>拦截</td>
+                                            <td>200 OK</td>
+                                            <td>暴力破解限制 Rule5041</td>
+                                            <td>暴力破解</td>
+                                            <td>中</td>
+                                            <td>待处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>198.51.100.23</td>
+                                            <td>Mozilla/5.0 (Linux; Android 10)</td>
+                                            <td>2024-11-08 16:01:34</td>
+                                            <td>隔离</td>
+                                            <td>403 Forbidden</td>
+                                            <td>XSS检测 Rule4001</td>
+                                            <td>XSS攻击</td>
+                                            <td>低</td>
+                                            <td>处理中</td>
+                                        </tr>
+                                        <tr>
+                                            <td>203.0.113.101</td>
+                                            <td>PostmanRuntime/7.28.4</td>
+                                            <td>2024-11-08 17:15:05</td>
+                                            <td>拦截</td>
+                                            <td>403 Forbidden</td>
+                                            <td>文件上传限制</td>
+                                            <td>文件上传攻击</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>192.0.2.45</td>
+                                            <td>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)</td>
+                                            <td>2024-11-08 18:20:50</td>
+                                            <td>阻止</td>
+                                            <td>403 Forbidden</td>
+                                            <td>跨站请求伪造检测</td>
+                                            <td>CSRF攻击</td>
+                                            <td>中</td>
+                                            <td>待处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>198.51.100.77</td>
+                                            <td>Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X)</td>
+                                            <td>2024-11-08 18:55:44</td>
+                                            <td>隔离</td>
+                                            <td>403 Forbidden</td>
+                                            <td>目录遍历检测</td>
+                                            <td>目录遍历</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>203.0.113.110</td>
+                                            <td>Mozilla/5.0 (Windows NT 10.0; Win64; x64)</td>
+                                            <td>2024-11-08 19:10:21</td>
+                                            <td>拦截</td>
+                                            <td>403 Forbidden</td>
+                                            <td>SQL注入检测 Rule7002</td>
+                                            <td>SQL注入</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>192.168.0.55</td>
+                                            <td>curl/7.29.0</td>
+                                            <td>2024-11-08 19:13:32</td>
+                                            <td>阻止</td>
+                                            <td>403 Forbidden</td>
+                                            <td>暴力破解限制 Rule5041</td>
+                                            <td>暴力破解</td>
+                                            <td>中</td>
+                                            <td>待处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>198.51.100.33</td>
+                                            <td>Mozilla/5.0 (iPad; CPU OS 14_6 like Mac OS X)</td>
+                                            <td>2024-11-08 19:15:07</td>
+                                            <td>隔离</td>
+                                            <td>403 Forbidden</td>
+                                            <td>XSS检测 Rule4001</td>
+                                            <td>XSS攻击</td>
+                                            <td>低</td>
+                                            <td>处理中</td>
+                                        </tr>
+                                        <tr>
+                                            <td>203.0.113.145</td>
+                                            <td>PostmanRuntime/7.28.4</td>
+                                            <td>2024-11-08 19:22:15</td>
+                                            <td>阻止</td>
+                                            <td>403 Forbidden</td>
+                                            <td>文件上传限制</td>
+                                            <td>文件上传攻击</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>192.0.2.100</td>
+                                            <td>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5)</td>
+                                            <td>2024-11-08 19:25:33</td>
+                                            <td>拦截</td>
+                                            <td>403 Forbidden</td>
+                                            <td>跨站请求伪造检测</td>
+                                            <td>CSRF攻击</td>
+                                            <td>中</td>
+                                            <td>待处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>198.51.100.12</td>
+                                            <td>Mozilla/5.0 (Android 11; Mobile)</td>
+                                            <td>2024-11-08 19:30:18</td>
+                                            <td>隔离</td>
+                                            <td>403 Forbidden</td>
+                                            <td>目录遍历检测</td>
+                                            <td>目录遍历</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>203.0.113.78</td>
+                                            <td>curl/7.68.0</td>
+                                            <td>2024-11-08 19:35:41</td>
+                                            <td>阻止</td>
+                                            <td>403 Forbidden</td>
+                                            <td>SQL注入检测 Rule7001</td>
+                                            <td>SQL注入</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>192.168.1.89</td>
+                                            <td>Mozilla/5.0 (Windows NT 6.1; WOW64)</td>
+                                            <td>2024-11-08 19:38:59</td>
+                                            <td>拦截</td>
+                                            <td>403 Forbidden</td>
+                                            <td>暴力破解限制 Rule5041</td>
+                                            <td>暴力破解</td>
+                                            <td>中</td>
+                                            <td>处理中</td>
+                                        </tr>
+                                        <tr>
+                                            <td>198.51.100.88</td>
+                                            <td>Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)</td>
+                                            <td>2024-11-08 19:42:12</td>
+                                            <td>隔离</td>
+                                            <td>403 Forbidden</td>
+                                            <td>XSS检测 Rule4001</td>
+                                            <td>XSS攻击</td>
+                                            <td>低</td>
+                                            <td>处理中</td>
+                                        </tr>
+                                        <tr>
+                                            <td>203.0.113.200</td>
+                                            <td>PostmanRuntime/7.26.5</td>
+                                            <td>2024-11-08 19:45:26</td>
+                                            <td>阻止</td>
+                                            <td>403 Forbidden</td>
+                                            <td>文件上传限制</td>
+                                            <td>文件上传攻击</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>192.0.2.64</td>
+                                            <td>Mozilla/5.0 (Linux; Android 9)</td>
+                                            <td>2024-11-08 19:50:03</td>
+                                            <td>拦截</td>
+                                            <td>403 Forbidden</td>
+                                            <td>跨站请求伪造检测</td>
+                                            <td>CSRF攻击</td>
+                                            <td>中</td>
+                                            <td>待处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>198.51.100.99</td>
+                                            <td>Mozilla/5.0 (Windows NT 10.0)</td>
+                                            <td>2024-11-08 19:55:19</td>
+                                            <td>隔离</td>
+                                            <td>403 Forbidden</td>
+                                            <td>目录遍历检测</td>
+                                            <td>目录遍历</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>203.0.113.50</td>
+                                            <td>curl/7.54.0</td>
+                                            <td>2024-11-08 20:00:17</td>
+                                            <td>阻止</td>
+                                            <td>403 Forbidden</td>
+                                            <td>SQL注入检测 Rule7002</td>
+                                            <td>SQL注入</td>
+                                            <td>高</td>
+                                            <td>已处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>192.168.0.77</td>
+                                            <td>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6)</td>
+                                            <td>2024-11-08 20:05:55</td>
+                                            <td>拦截</td>
+                                            <td>403 Forbidden</td>
+                                            <td>暴力破解限制 Rule5041</td>
+                                            <td>暴力破解</td>
+                                            <td>中</td>
+                                            <td>待处理</td>
+                                        </tr>
+                                        <tr>
+                                            <td>198.51.100.45</td>
+                                            <td>Mozilla/5.0 (Linux; Android 8.1.0)</td>
+                                            <td>2024-11-08 20:10:43</td>
+                                            <td>隔离</td>
+                                            <td>403 Forbidden</td>
+                                            <td>XSS检测 Rule4001</td>
+                                            <td>XSS攻击</td>
+                                            <td>低</td>
+                                            <td>处理中</td>
+                                        </tr>
+                                        
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+       
+            <!-- end main content-->
+
+        </div>
+        <!-- END layout-wrapper -->
+
+        <!-- Right Sidebar -->
+        <div class="right-bar">
+            <div data-simplebar class="h-100">
+
+                <div class="rightbar-title d-flex align-items-center px-3 py-4">
+            
+                    <h5 class="m-0 me-2">Settings</h5>
+
+                    <a href="javascript:void(0);" class="right-bar-toggle ms-auto">
+                        <i class="mdi mdi-close noti-icon"></i>
+                    </a>
+                </div>
+
+                <!-- Settings -->
+                <hr class="mt-0" />
+                <h6 class="text-center mb-0">Choose Layouts</h6>
+
+                <div class="p-4">
+                    <div class="mb-2">
+                        <img src="assets/images/layouts/layout-1.jpg" class="img-fluid img-thumbnail" alt="">
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input type="checkbox" class="form-check-input theme-choice" id="light-mode-switch" checked />
+                        <label class="form-check-label" for="light-mode-switch">Light Mode</label>
+                    </div>
+    
+                    <div class="mb-2">
+                        <img src="assets/images/layouts/layout-2.jpg" class="img-fluid img-thumbnail" alt="">
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input type="checkbox" class="form-check-input theme-choice" id="dark-mode-switch" data-bsStyle="assets/css/bootstrap-dark.min.css" data-appStyle="assets/css/app-dark.min.css" />
+                        <label class="form-check-label" for="dark-mode-switch">Dark Mode</label>
+                    </div>
+    
+                    <div class="mb-2">
+                        <img src="assets/images/layouts/layout-3.jpg" class="img-fluid img-thumbnail" alt="">
+                    </div>
+                    <div class="form-check form-switch mb-5">
+                        <input type="checkbox" class="form-check-input theme-choice" id="rtl-mode-switch" data-appStyle="assets/css/app-rtl.min.css" />
+                        <label class="form-check-label" for="rtl-mode-switch">RTL Mode</label>
+                    </div>
+
+            
+                </div>
+
+            </div> <!-- end slimscroll-menu-->
+        </div>
+        <!-- /Right-bar -->
+
+        <!-- Right bar overlay-->
+        <div class="rightbar-overlay"></div>
+
+        <!-- JAVASCRIPT -->
+        <script src="assets/libs/jquery/jquery.min.js"></script>
+        <script src="assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+        <script src="assets/libs/metismenu/metisMenu.min.js"></script>
+        <script src="assets/libs/simplebar/simplebar.min.js"></script>
+        <script src="assets/libs/node-waves/waves.min.js"></script>
+        <script src="assets/libs/jquery-sparkline/jquery.sparkline.min.js"></script>
+
+        <!--Morris Chart-->
+        <script src="assets/libs/morris.js/morris.min.js"></script>
+        <script src="assets/libs/raphael/raphael.min.js"></script>
+
+        <script src="assets/js/pages/dashboard.init.js"></script>
+
+        <script src="assets/js/app.js"></script>
+
+        <!-- Init js -->
+        <script src="assets/js/pages/morris.init.js"></script>
+
+        <!-- App js -->
+        <script src="assets/js/app.js"></script>
+    </body>
+
+</html>

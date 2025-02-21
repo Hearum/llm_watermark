@@ -5,9 +5,9 @@ export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_rel
 export HF_ENDPOINT=https://hf-mirror.com
 
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 
-DATASET=wikitext
+DATASET=c4
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
 #     --dataset_name=c4
