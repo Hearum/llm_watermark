@@ -224,7 +224,7 @@ class WatermarkBase:
             if input_ids.shape[-1] < self.threshold_len:
                 select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
             else:
-                select_ids = self.find_ids_within_percentile(ids=input_ids[-self.threshold_len],fixed_id=next_token,threshold=1) 
+                select_ids = self.find_ids_within_percentile(ids=input_ids[-self.threshold_len:],fixed_id=next_token,threshold=1) 
         else:
             if input_ids.shape[-1] < self.threshold_len:
                 select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
@@ -717,10 +717,10 @@ class WatermarkDetector(WatermarkBase):
 
         # HF-style output dictionary
         # 更新字典内容
-        print(green_token_mask)
-        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
-        print(pos)
-        print("detector inputids",input_ids)
+        # print(green_token_mask)
+        # pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
+        # print(pos)
+        # print("detector inputids",input_ids)
 
         score_dict = dict()
         if return_num_tokens_scored:
@@ -905,7 +905,7 @@ def test_no_watermark_test():
     
     # 创建 WatermarkLogitsProcessor
     from datasets import load_dataset
-    prompt = raw_datasets = load_dataset('openai/openai_humaneval',split='test')['prompt'][0] 
+    prompt = " The people here live for more than 100 years and their bodies are very healthy. There was an old woman who lived in this kingdom. She was so happy because she had three sons. However one day her husband died. "#raw_datasets = load_dataset('openai/openai_humaneval',split='test')['prompt'][0] 
     # "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing game where players take control of a military unit and take part in missions against enemy forces . Stories are told through comic book @-@ like panels with"
     #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
     # 编码 prompt
@@ -968,7 +968,7 @@ def test_no_watermark_test():
     )
     
     result = detector.detect(text=no_watermark_out)
-    # 输出结果
+
     print("no_watermark_out检测结果:")
     for key, value in result.items():
         print(f"{key}: {value}")
@@ -978,7 +978,22 @@ def test_no_watermark_test():
     print("no_watermark_out检测结果:")
     for key, value in result.items():
         print(f"{key}: {value}")
-    print(model.config)
+
+    from openai import OpenAI
+    import openai
+    client = OpenAI(api_key="sk-ca26777094044efeb41e4421af1de444", base_url="https://api.deepseek.com")
+
+    prompt = "As an expert copy-editor, please rewrite the following text in your own voice while ensuring that the final output contains the same information as the original text and has roughly the same length. Please paraphrase all sentences and do not omit any crucial details. Additionally, please take care to provide any relevant information about public figures, organizations, or other entities mentioned in the text to avoid any potential misunderstandings or biases."
+    attacker_query = prompt + watermark_out 
+    query_msg = {"role": "user", "content": attacker_query}
+    outputs = client.chat.completions.create(model='deepseek-chat', messages=[query_msg], temperature=0.7, max_tokens=350)
+    attacked_text = outputs.choices[0].message.content
+
+    # 输出结果
+    print('#'*50,"attack text",'#'*50)
+    result = detector.detect(text=attacked_text)
+    for key, value in result.items():
+        print(f"{key}: {value}")
 if __name__ == '__main__':
     test_no_watermark_test()
     # test_detector()
