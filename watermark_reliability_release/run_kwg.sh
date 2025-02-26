@@ -6,14 +6,14 @@ cd /home/shenhm/documents/lm-watermarking/watermark_reliability_release
 export HF_HOME=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/dataset
 export HF_ENDPOINT=https://hf-mirror.com
 
-DATASET=c4
+DATASET=lfqa
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
 #     --dataset_name=c4
 # openai_humaneval
 # codeparrot
-MODEL_NAME=llama_13B
-DELTA=4
+MODEL_NAME=llama_7B
+DELTA=5
 GAMMA=0.25
 GENERATE_LEN=150
 SCHEME=ff-anchored_minhash_prf-4-True-15485863
