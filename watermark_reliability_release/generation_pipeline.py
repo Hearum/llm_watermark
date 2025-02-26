@@ -250,7 +250,11 @@ def main(args):
     dataset_w_prompts = dataset.map(tokenize_prompts, batched=False)
 
     # filter the rows of the dataset based on length checks for the tokenized prompts and baseline completions
-    dataset_input_len_filtered = dataset_w_prompts.filter(input_check, batched=False)
+    if args.truncate_input_for_prompt:
+        dataset_input_len_filtered = dataset_w_prompts.filter(input_check, batched=False)
+    else:
+        dataset_input_len_filtered = dataset_w_prompts
+
 
     # need to remove the input tensor column after this map
     # bc it persists between the prompt creation and generation maps

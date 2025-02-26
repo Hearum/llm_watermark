@@ -20,5 +20,12 @@ def load_lfqa(args=None, path="./utils/data/lfqa.jsonl"):
             row = {k: ex[k] for k in cols_to_load}
             row["prefix"] = f"{prompts[args.prompt_id]}{row['prefix']}"
             yield row
+
     dataset = IterableDataset.from_generator(lfqa_generator)
+    
+    for i, example in enumerate(dataset):
+        print(example)
+        if i == 3:  # 打印前四条数据
+            break
+
     return dataset

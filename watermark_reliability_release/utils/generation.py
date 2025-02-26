@@ -334,6 +334,11 @@ def load_hf_dataset(args):
         except Exception as e:
             # can't infer length of dataset, probably because it's an IterableDataset
             pass
+
+    # for i, example in enumerate(limited_dataset):
+    #     print(example)
+    #     if i == 3:  # 打印前四条数据
+    #         pdb.set_trace()
     return limited_dataset
 
 
