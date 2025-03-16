@@ -136,7 +136,7 @@ def load_model(args):
         [(model_type in args.model_name_or_path) for model_type in ["t5", "T0"]]
     )
     args.is_decoder_only_model = any(
-        [(model_type in args.model_name_or_path) for model_type in ["gpt", "opt", "bloom", "llama"]]
+        [(model_type in args.model_name_or_path) for model_type in ["gpt", "opt", "bloom", "llama","Mistral"]]
     )
     
     if args.is_seq2seq_model:
@@ -179,7 +179,7 @@ def load_model(args):
         tokenizer = AutoTokenizer.from_pretrained(
             args.model_name_or_path, padding_side=padding_side
         )
-
+        tokenizer.pad_token = tokenizer.eos_token
     args.model_max_length = model.config.max_position_embeddings
 
     return model, tokenizer, device

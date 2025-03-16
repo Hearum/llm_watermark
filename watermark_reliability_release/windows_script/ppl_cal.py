@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.25_LSH_v2.2_lfqa_new/gen_table_GPT.jsonl_z_score",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
@@ -90,10 +90,7 @@ def check_missing_z_scores(data):
         print("\nAll entries have the required z_score fields.")
 from tqdm import tqdm
 import math
-
-
 def main():
-    
     args = parse_args()
 
     data = []

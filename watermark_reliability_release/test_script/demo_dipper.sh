@@ -1,15 +1,15 @@
 
 #!/bin/bash
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=0
 
-PATH_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-6-True-15485863
-L=20
-O=20
+PATH_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit
+L=40
+O=40
 
-# python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
-#     --data_path="$PATH_DIR""/gen_table.jsonl" \
-#     --o $O \
-#     --l $L \
+python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
+    --data_path="$PATH_DIR""/gen_table.jsonl" \
+    --o $O \
+    --l $L \
 
 if [[ "$PATH_DIR" == *"KWG"* ]]; then
     python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_kwg.py \

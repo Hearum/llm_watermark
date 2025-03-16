@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import pdb
 import os
 import argparse
 from functools import partial
@@ -35,6 +35,7 @@ from utils.io import write_jsonlines, write_json
 # watermarking functionality
 from watermark_processor import WatermarkLogitsProcessor
 from watermark_processor_kwg import WatermarkLogitsProcessor as KWG_WatermarkLogitsProcessor
+from wateramrk_processor_windows import WatermarkLogitsProcessor as LSH_Win_WatermarkLogitsProcessor
 # generation pipeline helpers
 from utils.generation import (
     MAX_GENERATIONS,
@@ -180,8 +181,18 @@ def main(args):
             store_spike_ents=args.store_spike_ents,
             select_green_tokens=True,
         )
+    elif args.LSH_windows:
+        pdb.set_trace()
+        watermark_processor = LSH_Win_WatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
+                                                       prefix_len=0,
+                                                        gamma=args.gamma,
+                                                        delta=args.delta,
+                                                        seeding_scheme=args.seeding_scheme,
+                                                        select_green_tokens=True,
+                                                        threshold_len=args.h_win,
+                                                        windows_h_uesd=True)  
     else:
-        import pdb
+        
         pdb.set_trace()
         watermark_processor = KWG_WatermarkLogitsProcessor(
             vocab=list(tokenizer.get_vocab().values()),
@@ -192,6 +203,15 @@ def main(args):
             select_green_tokens=True,
         )
 
+    # if args.LSH_windows:
+    #     watermark_processor = WatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
+    #                                                    prefix_len=0,
+    #                                                     gamma=args.gamma,
+    #                                                     delta=args.delta,
+    #                                                     seeding_scheme=args.seeding_scheme,
+    #                                                     select_green_tokens=True,
+    #                                                     threshold_len=args.h_win,
+    #                                                     windows_h_uesd  = True)
     ###########################################################################
     # Configure the generation partials
     ###########################################################################
@@ -657,6 +677,16 @@ if __name__ == "__main__":
         type=str2bool,
         default=False,
     )
+    parser.add_argument(
+        "--LSH_windows",
+        type=str2bool,
+        default=False,
+    )
+    parser.add_argument(
+        "--h_win",
+        type=int,
+        default=8,
+    )   
     args = parser.parse_args()
 
     ###########################################################################

@@ -1,15 +1,133 @@
+################################################
+# Dataset-Methord Visualization ppl
+################################################
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
-from evaluate import load
-import pdb
-perplexity = load("perplexity", module_type="metric")
+colors = ['#5975A4','#CC8963','#5F9E6E','#B55D60','#857AAB','#8D7866']
 
-test = """
-LOS ANGELES (Reuters) - Walt Disney Co will ban smoking, vaping and large strollers at its U.S. theme parks in California and Florida starting on May 1, the company said on Thursday.\nThe restrictions are designed in part to help deal with the large crowds expected to flock later this year to new \u201cStar Wars\u201d-themed attractions at Walt Disney World in Orlando, Florida, and at Disneyland in Anaheim, California.\nDisney said in a blog post that it would remove designated smoking areas at Walt Disney World, Disneyland, water parks, the ESPN Wide World of Sports Complex in Florida and the Downtown Disney shopping district in California.\nSmoking areas will be available outside park entrances and in Disney hotels, the company said.\nStroller size will be limited to 31 inches wide and 52 inches long, and no stroller wagons will be permitted. Disney said many strollers on the market, including many double jogging strollers, fit these specifications.\n\u201cThese updates are intended to provide a more enjoyable experience for everyone who visits by, among other things, easing guest flow and reducing congestion,\u201d Disney said.\nDisney also banned loose ice, often brought in coolers to chill beverages, and dry ice to help speed bag checks at entrances. Reusable ice packs are allowed, and visitors can ask for free ice at food and beverage stands, the company said.\nThe 14-acre (5.67-hectare) \u201cStar Wars: Galaxy\u2019s Edge\u201d sections will open May 31 at Disneyland and Aug. 29 at Walt Disney World.", "textwm": " Walt Disney Co. has announced several restrictions at its U.S. theme parks, including bans on smoking, vaping, and large strollers, starting from May 1. The restrictions are aimed at improving the experience for visitors, particularly with the upcoming opening of the highly anticipated \"Star Wars: Galaxy's Edge\" areas at Disneyland in Anaheim, California, and Walt Disney World in Orlando, Florida.\n\nThe following restrictions will be implemented at all U.S. theme parks, including Walt Disney World, Disneyland, water parks, the ESPN Wide World of Sports Complex in Florida, and the Downtown Disney shopping district in California:\n\n1. Smoking areas will be removed, and designated smoking areas will be available outside park entrances and in Disney hotels.\n2. Strollers will be limited to 31 inches wide and 52 inches long, and no stroller wagons will be permitted. Most double jogging strollers fit within these specifications, according to Disney.\n3. Loose ice, often brought in coolers to chill beverages, will no longer be allowed. Reusable ice packs are acceptable, and visitors can request free ice at food and beverage stands.\n4. Dry ice will also no longer be permitted.\n\nDisney has implemented these restrictions to enhance guest experience, particularly with the upcoming openings of \"Star Wars: Galaxy's Edge.\" The highly immersive and interactive area will feature attractions, entertainment, and interactive experiences that are expected to attract large crowds. By limiting strollers, Disney aims to improve guest flow and reduce congestion, ensuring that all visitors can fully enjoy their experience.\n\nThe restrictions will go into effect on May 1, just ahead of the highly anticipated May 31 opening of \"Star Wars: Galaxy's Edge\" at Disneyland and the Aug. 29 opening at Walt Disney World. Visitors are advised to check Disney's official website for updates on park rules and restrictions.
-"""
-input_texts = [test]
+# Generating synthetic data for the boxplot (since actual data isn't provided)
+np.random.seed(42)
 
-results = perplexity.compute(model_id='gpt2',
-                             add_start_token=False,
-                             predictions=input_texts)
-print(results)
-pdb.set_trace()
+category_model = []
+z_scores = []
+categories = ['Watermarked', 'Watermarked-attacked', 'Un-watermarked']
+models = ["WikiText-LSH","WikiText-KGW" ,"C4-LSH","C4-KGW", "LFQA-LSH", "LFQA-KGW"]
+
+
+# WikiText_LSH="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.2_LSH_v2.2_c4_new/gen_table_GPT.jsonl_ppl"
+# C4_LSH_path="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.2_LSH_v2.2_c4_new/gen_table_GPT.jsonl_ppl"
+# LFQA_LSH_path="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.2_LSH_v2.2_c4_new/gen_table_GPT.jsonl_ppl"
+
+# WikiText_KGW="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_ppl" 
+# C4_KGW_path="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl_ppl"
+# LFQA_KGW_path="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl_ppl"
+
+import json
+import numpy as np
+
+# 路径列表
+paths = {
+    "WikiText_LSH": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.2_LSH_v2.2_c4_new/gen_table_GPT.jsonl_ppl",
+    "C4_LSH": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.2_LSH_v2.2_c4_new/gen_table_GPT.jsonl_ppl",
+    "LFQA_LSH": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.25_LSH_v2.2_lfqa_new/gen_table_GPT.jsonl_ppl",
+    "WikiText_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_ppl",
+    "C4_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl_ppl",
+    "LFQA_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_GPT.jsonl_ppl"
+}
+
+# 用于存储数据的字典
+all_data = {}
+
+# 处理每个路径
+for key, path in paths.items():
+    data = {"w_wm_output_ppl": [], "w_wm_output_attacked_ppl": [], "no_wm_output_ppl": []}
+    
+    with open(path, 'r', encoding='utf-8') as file:
+        for line in file:
+            try:
+                entry = json.loads(line.strip())
+                
+                if 'w_wm_output_ppl' in entry:
+                    data["w_wm_output_ppl"].append(entry["w_wm_output_ppl"])
+                if 'w_wm_output_attacked_ppl' in entry:
+                    data["w_wm_output_attacked_ppl"].append(entry["w_wm_output_attacked_ppl"])
+                if 'no_wm_output_ppl' in entry:
+                    data["no_wm_output_ppl"].append(entry["no_wm_output_ppl"])
+            except json.JSONDecodeError as e:
+                print(f"JSON解析失败: {e}, 跳过这一行")
+    
+    all_data[key] = data
+
+# 模拟 Z-Score 数据
+data = {
+    "Watermarked": {
+        "WikiText-LSH": np.array(all_data["WikiText_LSH"]['w_wm_output_ppl']),
+        "WikiText-KGW": np.array(all_data["WikiText_KGW"]['w_wm_output_ppl']),
+        "C4-LSH": np.array(all_data["C4_LSH"]['w_wm_output_ppl']),
+        "C4-KGW": np.array(all_data["C4_KGW"]['w_wm_output_ppl']),
+        "LFQA-LSH": np.array(all_data["LFQA_LSH"]['w_wm_output_ppl']),
+        "LFQA-KGW": np.array(all_data["LFQA_KGW"]['w_wm_output_ppl']),
+    },
+    "Watermarked-attacked": {
+        "WikiText-LSH": np.array(all_data["WikiText_LSH"]['w_wm_output_attacked_ppl']),
+        "WikiText-KGW": np.array(all_data["WikiText_KGW"]['w_wm_output_attacked_ppl']),
+        "C4-LSH": np.array(all_data["C4_LSH"]['w_wm_output_attacked_ppl']),
+        "C4-KGW": np.array(all_data["C4_KGW"]['w_wm_output_attacked_ppl']),
+        "LFQA-LSH": np.array(all_data["LFQA_LSH"]['w_wm_output_attacked_ppl']),
+        "LFQA-KGW": np.array(all_data["LFQA_KGW"]['w_wm_output_attacked_ppl']),
+    },
+    "Un-watermarked": {
+        "WikiText-LSH": np.array(all_data["WikiText_LSH"]['no_wm_output_ppl']),
+        "WikiText-KGW": np.array(all_data["WikiText_KGW"]['no_wm_output_ppl']),
+        "C4-LSH": np.array(all_data["C4_LSH"]['no_wm_output_ppl']),
+        "C4-KGW": np.array(all_data["C4_KGW"]['no_wm_output_ppl']),
+        "LFQA-LSH": np.array(all_data["LFQA_LSH"]['no_wm_output_ppl']),
+        "LFQA-KGW": np.array(all_data["LFQA_KGW"]['no_wm_output_ppl']),
+    }
+}
+
+category_list = []
+model_list = []
+zscore_list = []
+
+for category in categories:
+    for model in models:
+        # Check that the z-scores have the same length
+        zscores = data[category][model][:200]
+        # Extend the lists based on the actual data length
+        category_list.extend([category] * len(zscores))
+        model_list.extend([model] * len(zscores))
+        zscore_list.extend(zscores)
+
+df_corrected = pd.DataFrame({
+    "Category": category_list,
+    "Model": model_list,
+    "Z-Score": zscore_list
+})
+
+# 设置绘图
+plt.figure(figsize=(10, 8),dpi=300)
+
+# 创建箱型图
+import seaborn as sns
+sns.set(style="whitegrid")
+
+# 定制离群点的样式为菱形
+flierprops = dict(marker='D', markersize=6, alpha=0.7)
+
+ax = sns.boxplot(
+    x="Category", y="Z-Score", hue="Model", data=df_corrected,
+    palette=colors, showfliers=True, linewidth=2.0)
+
+plt.legend(title="Dataset-Model", loc="upper right", bbox_to_anchor=(1, 0))
+# 定制化图表
+ax.set_ylabel('Z-Score', fontsize=14)  # 增加字体大小
+ax.set_xlabel('')
+ax.set_xticklabels(['Watermarked', 'Watermarked-attacked', 'Un-watermarked'], fontsize=14)
+# ax.set_title("Boxplot of Z-Scores by Dataset Type and Model")
+plt.legend(title="Dataset-Method", bbox_to_anchor=(0.78, 0.95), loc="upper left")
+
+plt.tight_layout()
+plt.show()

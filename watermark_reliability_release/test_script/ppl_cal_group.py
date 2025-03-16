@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.25_LSH_v2.2_lfqa_new/gen_table_GPT.jsonl_z_score",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
@@ -92,12 +92,11 @@ from tqdm import tqdm
 import math
 
 
-def main():
+def main(data_path):
     
     args = parse_args()
-
     data = []
-    with open(args.data_path, 'r', encoding='utf-8') as file:
+    with open(data_path, 'r', encoding='utf-8') as file:
         for line in file:
             data.append(json.loads(line.strip()))
 
@@ -107,27 +106,6 @@ def main():
     batch_size = 32  # 可以根据实际内存和计算能力调整批次大小
     batch_data = []  # 用于存储当前批次的文本
     batch_keys = []  # 用于存储对应文本的key（用于后续赋值）
-
-    # output_file = args.data_path + '_ppl'  # 计算困惑度后的输出文件路径
-    # if os.path.exists(output_file):
-    #     print(f"File {output_file} already exists. Skipping computation.")
-    #     with open(output_file, 'r', encoding='utf-8') as file:
-    #         for line in file:
-    #             data.append(json.loads(line.strip()))
-        
-    #     # 打印已经计算好的困惑度结果
-    #     print('#' * 50, "result", '#' * 50)
-    #     for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output", "baseline_completion"]:
-    #         # 计算每个 key 的平均 perplexity，忽略 NaN 值
-    #         valid_ppls = [item.get(f"{key}_ppl", float('nan')) for item in data if not math.isnan(item.get(f"{key}_ppl", float('nan')))]
-    #         if valid_ppls:
-    #             mean_ppl = np.mean(valid_ppls)
-    #         else:
-    #             mean_ppl = math.nan
-    #         print(key, mean_ppl)
-    #     import sys
-    #     sys.exit(1)
-
 
     for item in tqdm(data):
         for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output", "baseline_completion"]:
@@ -201,4 +179,8 @@ def main():
             mean_ppl = math.nan
         print(key, mean_ppl)
 if __name__ == '__main__':
-    main()
+    paths = ["/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_GPT.jsonl_z_score",
+             ]
+
+    for path in paths:
+        main(path)
