@@ -112,7 +112,7 @@ def main():
     with open(args.config_path, 'r', encoding='utf-8') as infile:
         config_data = json.load(infile)
 
-    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(config_data.get('model_name_or_path'),local_files_only=True)
     watermark_detector = WatermarkDetector(
         vocab=list(tokenizer.get_vocab().values()),
         gamma=config_data.get('gamma'),

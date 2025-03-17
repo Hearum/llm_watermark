@@ -1,140 +1,162 @@
-
-import sys
-sys.path.append("/home/shenhm/documents/lm-watermarking/watermark_reliability_release")
-from watermark_processor_kwg import WatermarkDetector
 import os
 import json
 from copy import deepcopy
-from types import NoneType
 
-from typing import Union
 import numpy as np
 import sklearn.metrics as metrics
 import argparse  
-import torch
-from utils.submitit import str2bool  # better bool flag type for argparse
-from functools import partial
-from dataclasses import dataclass
-import os
 import json
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from torch.nn.functional import softmax
-import pdb
+import math
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--human_fname",
+        type=str,
+        default="outputs_human",
+        help="File name of human code detection results",
+    )
+    parser.add_argument(
+        "--machine_fname",
+        type=str,
+        default="outputs",
+        help="File name of machine code detection results",
+    )
+    parser.add_argument(
         "--data_path",
         type=str,
-        default="",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_4_gamma_0.25_KWG_selfhash/gen_table.jsonl_z_score",
         help="Path to the data file containing the z-scores"
-    )
-    parser.add_argument(
-        "--config_path",
-        type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_4_32_0.2_LSH_v2.2_c4_new/gen_table_meta.json",
-    )
-    parser.add_argument(
-        "--seeding_scheme",
-        type=str,
-        help="The seeding procedure to use for the watermark.",
-    )
-    parser.add_argument(
-        "--gamma",
-        type=float,
-        default="0.25",
-    )
-    parser.add_argument(
-        "--detection_z_threshold",
-        type=float,
-        default=4.0,
-        help="The test statistic threshold for the detection hypothesis test.",
-    )
-    # parser.add_argument(
-    #     "--normalizers",
-    #     type=Union[str, NoneType],
-    #     default=None,
-    #     help="Single or comma separated list of the preprocessors/normalizer names to use when performing watermark detection.",
-    # )
-    parser.add_argument(
-        "--ignore_repeated_ngrams",
-        type=str2bool,
-        default=False,
-        help="Whether to use the detection method that only counts each unqiue bigram once as either a green or red hit.",
     )
     return parser.parse_args()
 
-def check_missing_z_scores(data):
-    missing_count = 0
-    for idx, entry in enumerate(data):
-        # 检查 'w_wm_output_z_score' 是否存在
-        if 'w_wm_output_z_score' not in entry:
-            missing_count += 1
-            print(f"Missing 'w_wm_output_z_score' in entry {idx}: {entry}")
-        
-        # 检查其他可能缺少的 z_score 字段
-        if 'w_wm_output_attacked_z_score' not in entry:
-            missing_count += 1
-            print(f"Missing 'w_wm_output_attacked_z_score' in entry {idx}: ")
-        
-        if 'no_wm_output_z_score' not in entry:
-            missing_count += 1
-            print(f"Missing 'no_wm_output_z_score' in entry {idx}")
-    
-    # 输出缺少 z_score 的条目数量
-    if missing_count > 0:
-        print(f"\nTotal {missing_count} entries are missing z_score fields.")
-    else:
-        print("\nAll entries have the required z_score fields.")
-from tqdm import tqdm
-import math
-def main():
-    args = parse_args()
-    with open(args.config_path, 'r', encoding='utf-8') as infile:
-        config_data = json.load(infile)
-    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
-    
-    watermark_detector = WatermarkDetector(
-        vocab=list(tokenizer.get_vocab().values()),
-        gamma=config_data.get('gamma'),
-        seeding_scheme=config_data.get('seeding_scheme'),
-        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        tokenizer=tokenizer,
-        z_threshold=args.detection_z_threshold,
-        # normalizers=args.normalizers,
-        ignore_repeated_ngrams=args.ignore_repeated_ngrams,
-    )
+def load_z_scores(file_path):
     data = []
-    with open(args.data_path, 'r', encoding='utf-8') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         for line in file:
             data.append(json.loads(line.strip()))
 
-    # 遍历数据并计算 z_score
-    for item in tqdm(data):
-        for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output"]:
-            input_text = item.get(key, "")  # 获取文本内容
-            if input_text:  # 确保文本不为空
-                try:
-                    # 调用 watermark_detector.detect 获取 score_dict
-                    score_dict = watermark_detector.detect(
-                                input_text,
-                                return_prediction=False,
-                                convert_to_float=True,
-                            )
-                    # 获取 z_score，如果没有就设置为 NaN
-                    item[f"{key}_z_score"] = score_dict.get("z_score", math.nan)
-                except ValueError as e:
-                    # 捕获 ValueError 异常，并将 z_score 设置为 NaN
-                    if "Must have at least 1 token" in str(e):
-                        item[f"{key}_z_score"] = math.nan
-                    else:
-                        raise  # 如果是其他 ValueError 异常，重新抛出
-    # 写回 JSONL 文件
-    with open(args.data_path+'_z_score', 'w', encoding='utf-8') as file:
-        for item in data:
-            file.write(json.dumps(item, ensure_ascii=False) + "\n")
-    print(f"Updated JSONL file saved to: {args.data_path+'_z_score'}")
+    # Assuming 'w_wm_output_z_score' and 'no_wm_output_z_score' are the relevant keys
+    human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data]
+    # w_wm_output_attacked_z_score  w_wm_output_z_score
+    machine_z_scores = [entry.get('w_wm_output_attacked_z_score', math.nan) for entry in data]
+    return human_z_scores, machine_z_scores
 
-if __name__ == '__main__':
+def load_z_scores_2(file_path):
+    data = []
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            data.append(json.loads(line.strip()))
+
+    # Assuming 'w_wm_output_z_score' and 'no_wm_output_z_score' are the relevant keys
+    human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data]
+    # w_wm_output_attacked_z_score  w_wm_output_z_score
+    machine_z_scores = [entry.get('w_wm_output_z_score', math.nan) for entry in data]
+    return human_z_scores, machine_z_scores
+
+def get_roc_auc(human_z, machine_z):
+    assert len(human_z) == len(machine_z)
+
+    # Combine human and machine z-scores
+    all_scores = np.concatenate([np.array(human_z), np.array(machine_z)])
+    
+    # Generate labels for the scores (0 for human, 1 for machine)
+    baseline_labels = np.zeros_like(human_z)
+    watermark_labels = np.ones_like(machine_z)
+    all_labels = np.concatenate([baseline_labels, watermark_labels])
+
+    # Compute ROC curve and AUC
+    fpr, tpr, thresholds = metrics.roc_curve(all_labels, all_scores, pos_label=1)
+    roc_auc = metrics.auc(fpr, tpr)
+
+    return roc_auc, fpr, tpr, thresholds
+def clean_z_scores(human_z, machine_z):
+    # Filter out any NaN values from both human_z and machine_z
+    valid_human_z = [z for z in human_z if not np.isnan(z)]
+    valid_machine_z = [z for z in machine_z if not np.isnan(z)]
+    
+    # Ensure both lists are of the same length
+    min_len = min(len(valid_human_z), len(valid_machine_z))
+    return valid_human_z[:min_len], valid_machine_z[:min_len]
+
+def get_tpr(fpr, tpr, error_rate):
+    assert len(fpr) == len(tpr)
+
+    value = None
+    for f, t in zip(fpr, tpr):
+        if f <= error_rate:
+            value = t
+        else:
+            assert value is not None
+            return value
+
+    assert value == 1.0
+    return value
+
+import os
+import pdb
+
+def main():
+    args = parse_args()
+    print(args.data_path)
+    
+    # 结果保存文件路径
+    
+    result_file_path = os.path.splitext(args.data_path)[0] + f"sever_baseline.txt"
+
+    # Open the result file for writing
+    with open(result_file_path, 'w') as result_file:
+        # Write the header for the results
+        result_file.write(f"Results for {args.data_path}\n")
+        result_file.write("=" * 50 + "\n")
+
+        # First run
+        print("Processing first z-scores...")
+        human_z, machine_z = load_z_scores_2(args.data_path)
+
+        # Clean NaN values from z-scores
+        human_z, machine_z = clean_z_scores(human_z, machine_z)
+
+        # Calculate AUC-ROC and TPR values
+        roc_auc, fpr, tpr, thresholds = get_roc_auc(human_z, machine_z)
+
+        print(f"ROC AUC: {roc_auc}")
+        result_file.write(f"ROC AUC: {roc_auc}\n")
+
+        # 找到最接近 FPR = 0.1% (0.001) 的索引
+        idx = (np.abs(fpr - 0.001)).argmin()
+
+        # 对应的 z-score threshold
+        
+        z_score_at_fpr_001 = thresholds[idx]
+        print("z_score_at_fpr_001",z_score_at_fpr_001 )
+        result_file.write(f"z_score_at_fpr_0001: {z_score_at_fpr_001}\n")
+
+        # TPR (FPR = 0.1%)
+        tpr_value1 = get_tpr(fpr, tpr, 0.001)
+        print(f"TPR (FPR = 0.1%): {tpr_value1}")
+        result_file.write(f"TPR (FPR = 0.1%): {tpr_value1}\n")
+
+        result_file.write('#' * 50 + "\n")
+        pdb.set_trace()
+
+    print(f"Results saved to: {result_file_path}")
+
+
+    # # Updating machine results with the calculated metrics
+    # machine_results = json.load(open(args.machine_fname))
+    # watermark_detection = deepcopy(machine_results.get('watermark_detection', {}))
+    
+    # # Add the calculated metrics
+    # watermark_detection['roc_auc'] = roc_auc
+    # watermark_detection['TPR (FPR = 0%)'] = tpr_value0
+    # watermark_detection['TPR (FPR < 1%)'] = tpr_value1
+    # watermark_detection['TPR (FPR < 5%)'] = tpr_value5
+    
+    # # Save updated results back
+    # machine_results['watermark_detection'] = watermark_detection
+    # with open(args.machine_fname, 'w') as f:
+    #     json.dump(machine_results, f, indent=4)
+
+if __name__ == "__main__":
     main()

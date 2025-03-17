@@ -27,13 +27,13 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_4_gamma_0.25_KWG_selfhash/gen_table.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
         "--config_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_4_32_0.2_LSH_v2.2_c4_new/gen_table_meta.json",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_4_gamma_0.25_KWG_selfhash/gen_table_meta.json",
     )
     parser.add_argument(
         "--seeding_scheme",
@@ -93,7 +93,7 @@ def main():
     args = parse_args()
     with open(args.config_path, 'r', encoding='utf-8') as infile:
         config_data = json.load(infile)
-    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(config_data.get('model_name_or_path'),local_files_only=True)
     
     watermark_detector = WatermarkDetector(
         vocab=list(tokenizer.get_vocab().values()),

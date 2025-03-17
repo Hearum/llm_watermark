@@ -26,12 +26,6 @@ from evaluate import load
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data_path",
-        type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl",
-        help="Path to the data file containing the z-scores"
-    )
-    parser.add_argument(
         "--config_path",
         type=str,
         default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_4_32_0.2_LSH_v2.2_c4_new/gen_table_meta.json",
@@ -163,12 +157,11 @@ def main(data_path):
                 raise
 
     # 写回 JSONL 文件
-    with open(args.data_path+'_ppl', 'w', encoding='utf-8') as file:
+    with open(data_path+'_ppl', 'w', encoding='utf-8') as file:
         for item in data:
             file.write(json.dumps(item, ensure_ascii=False) + "\n")
 
-    print(f"Updated JSONL file saved to: {args.data_path + '_ppl'}")
-
+    print(f"Updated JSONL file saved to: {data_path + '_ppl'}")
     # 打印结果
     print('#' * 50, "result", '#' * 50)
     for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output", "baseline_completion"]:
@@ -179,8 +172,7 @@ def main(data_path):
             mean_ppl = math.nan
         print(key, mean_ppl)
 if __name__ == '__main__':
-    paths = ["/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_GPT.jsonl_z_score",
-             ]
+    paths = ["/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_z_score",]
 
     for path in paths:
         main(path)
