@@ -1,4 +1,6 @@
-
+###############
+# 改回使用generater方法生成水印了
+###############
 from __future__ import annotations
 import collections
 from math import sqrt
@@ -156,6 +158,7 @@ class WatermarkBase:
                 indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
             else:
                 indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
+
         extended_indices = torch.cat(indices)
         if extended_indices.size(0) > self.vocab_size:
             extended_indices = extended_indices[:self.vocab_size]
@@ -328,9 +331,9 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                     break
                 # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
-                    if len(final_greenlist)< 1 :
-                        print(self.rejection_count,len(final_greenlist) ,sorted_scores[0] - sorted_scores[idx + 1],False)
-                        self.rejection_count = self.rejection_count+1
+                    # if len(final_greenlist)< 1 :
+                    #     print(self.rejection_count,len(final_greenlist) ,sorted_scores[0] - sorted_scores[idx + 1],False)
+                    #     self.rejection_count = self.rejection_count+1
                     break
             elif tail_rule == "fixed_list_length":
                 if len(final_greenlist) == 10:
@@ -438,7 +441,7 @@ class WatermarkDetector(WatermarkBase):
         self.device = device
         self.z_threshold = z_threshold
         self.rng = torch.Generator(device=self.device)
-
+        self.visual = False
         self.normalizers = []
         for normalization_strategy in normalizers:
             self.normalizers.append(normalization_strategy_lookup(normalization_strategy))
@@ -520,7 +523,7 @@ class WatermarkDetector(WatermarkBase):
         # 计算当前token的签名
         signature = self._hash_function(embed_id, self.projection_matrix)
         input_ids_hash_table.append(copy.deepcopy(all_signatures))  # 保留当前token使用的签名集合
-        pdb.set_trace()
+
         # 使用前面几个token的签名为当前token生成红绿词表
         indices = []
         for hash_table_id in range(2**self.n_hashes):
@@ -693,7 +696,6 @@ class WatermarkDetector(WatermarkBase):
                 )
             )
         green_token_count, green_token_mask = 0, []
-        
         for idx in range(self.threshold_len, len(input_ids)):
             curr_token = input_ids[idx]
             greenlist_ids = self._get_greenlist_ids(input_ids[:idx],input_ids[idx])
@@ -706,10 +708,15 @@ class WatermarkDetector(WatermarkBase):
 
         # HF-style output dictionary
         # 更新字典内容
-        print(green_token_mask)
-        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
-        print(pos)
-        print("detector inputids",input_ids)
+        # print(green_token_mask)
+        # 假设 tokenizer 已经是你所用的 tokenizer 实例
+        if self.visual:
+            pos = [
+                [value, self.tokenizer.decode([int(input_ids[index])])]  # 解码 input_ids[index]
+                for index, value in enumerate(green_token_mask) ]
+
+        # print(pos)
+        # print("detector inputids",input_ids)
 
         score_dict = dict()
         if return_num_tokens_scored:
@@ -727,8 +734,9 @@ class WatermarkDetector(WatermarkBase):
             if z_score is None:
                 z_score = self._compute_z_score(green_token_count, num_tokens_scored)
             score_dict.update(dict(p_value=self._compute_p_value(z_score)))
-        if return_green_token_mask:
-            score_dict.update(dict(green_token_mask=green_token_mask))
+        if self.visual:
+            score_dict.update(dict(green_token_mask=pos))
+        
         # if return_z_at_T:
         #     # Score z_at_T separately:
         #     sizes = torch.arange(1, len(green_unique) + 1)
@@ -1044,9 +1052,7 @@ def test_no_watermark_test():
     print(f"Generating with {args}")
     
     # 创建 WatermarkLogitsProcessor
-    from datasets import load_dataset
-    prompt = raw_datasets = load_dataset('openai/openai_humaneval',split='test')['prompt'][0] 
-    # "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing game where players take control of a military unit and take part in missions against enemy forces . Stories are told through comic book @-@ like panels with"
+    prompt = "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing game where players take control of a military unit and take part in missions against enemy forces . Stories are told through comic book @-@ like panels with"
     #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
     # 编码 prompt
     input_ids = tokenizer.encode(prompt, return_tensors="pt")[:,1:].to(device)

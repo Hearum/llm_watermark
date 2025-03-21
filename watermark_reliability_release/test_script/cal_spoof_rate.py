@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/spoofing_attack/new_demo_kwg_h_4_spoofing_dolly-writing-100-long_8.5.jsonl",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/spoofing_attack/formot_signle_kwg_h_6_spoofing_dolly-writing-100-long_8.5.jsonl",
         help="Path to the data file containing the z-scores"
     )
     return parser.parse_args()
@@ -48,7 +48,7 @@ def main():
         # Write the header for the results
         result_file.write(f"Results for {args.data_path}\n")
         result_file.write("=" * 50 + "\n")
-
+        result_file.write("resulte:" +f"{np.sum(spoof_z_score>args.thread_base)/all_len}" + "\n")
     print(f"Results saved to: {result_file_path}")
 
 
