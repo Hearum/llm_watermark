@@ -123,8 +123,9 @@ def main():
         # normalizers=args.normalizers,
         ignore_repeated_ngrams=args.ignore_repeated_ngrams,
         n_hashes = config_data.get('n_hashes'),               # LSH的哈希函数数量，决定了有多少个桶
-        n_features=config_data.get('n_features'),            # 每个哈希函数的维度
+        # n_features=config_data.get('n_features'),            # 每个哈希函数的维度
         threshold=config_data.get('threshold'),
+        visualization=True,
     )
     data = []
     with open(args.data_path, 'r', encoding='utf-8') as file:
@@ -146,6 +147,12 @@ def main():
                             )
                     # 获取 z_score，如果没有就设置为 NaN
                     item[f"{key}_z_score"] = score_dict.get("z_score", math.nan)
+                    all_activated = [item['activated'] for item in score_dict.get('info', math.nan) if item is not None]
+                    item[f"activated_rate"] = sum(all_activated) / len(all_activated)
+                    len_input_ids = [len(item['input_ids']) for item in score_dict.get('info', math.nan)if item is not None]
+                    item[f"no_activated_rate"] = 1- item[f"activated_rate"]
+                    item[f"advantage_token_protect"] = sum(len_input_ids)/ len(all_activated)
+                    
                 except ValueError as e:
                     # 捕获 ValueError 异常，并将 z_score 设置为 NaN
                     if "Must have at least 1 token" in str(e):

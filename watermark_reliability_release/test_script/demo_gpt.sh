@@ -7,7 +7,8 @@ export CUDA_VISIBLE_DEVICES=2
 
 if [ -z "$1" ]; then
     echo "没有提供 PATH_DIR,使用默认路径。"
-    PATH_DIR="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/opt_6.7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863"
+    PATH_DIR="/home/shenhm/documents/temp/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_4_0.4_LSH_v3.0_c4"
+    echo "使用的 PATH_DIR: $PATH_DIR"
 else
     PATH_DIR="$1"
     echo "使用提供的 PATH_DIR: $PATH_DIR"
@@ -28,28 +29,28 @@ python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test
     --data_path="$PATH_DIR""/gen_table_GPT.jsonl_z_score" 
 
 
-##
+# ##
 
-if [ -z "$1" ]; then
-    echo "没有提供 PATH_DIR,使用默认路径。"
-    PATH_DIR="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/opt_6.7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.25_LSH_v2.2_c4_new"
-else
-    PATH_DIR="$1"
-    echo "使用提供的 PATH_DIR: $PATH_DIR"
-fi
+# if [ -z "$1" ]; then
+#     echo "没有提供 PATH_DIR,使用默认路径。"
+#     PATH_DIR="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/opt_6.7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.25_LSH_v2.2_c4_new"
+# else
+#     PATH_DIR="$1"
+#     echo "使用提供的 PATH_DIR: $PATH_DIR"
+# fi
 
-if [[ "$PATH_DIR" == *"KWG"* ]]; then
-    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_kwg.py \
-        --data_path="$PATH_DIR""/gen_table_GPT.jsonl" \
-        --config_path="$PATH_DIR""/gen_table_meta.json" 
-        #--seeding_scheme=ff-anchored_minhash_prf-4-True-15485863\
-else
-    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score.py \
-        --data_path="$PATH_DIR""/gen_table_GPT.jsonl" \
-        --config_path="$PATH_DIR""/gen_table_meta.json" 
-fi
+# if [[ "$PATH_DIR" == *"KWG"* ]]; then
+#     python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_kwg.py \
+#         --data_path="$PATH_DIR""/gen_table_GPT.jsonl" \
+#         --config_path="$PATH_DIR""/gen_table_meta.json" 
+#         #--seeding_scheme=ff-anchored_minhash_prf-4-True-15485863\
+# else
+#     python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score.py \
+#         --data_path="$PATH_DIR""/gen_table_GPT.jsonl" \
+#         --config_path="$PATH_DIR""/gen_table_meta.json" 
+# fi
 
-python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_auc_roc.py \
-    --data_path="$PATH_DIR""/gen_table_GPT.jsonl_z_score" 
+# python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_auc_roc.py \
+#     --data_path="$PATH_DIR""/gen_table_GPT.jsonl_z_score" 
 
 

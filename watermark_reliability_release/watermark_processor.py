@@ -19,7 +19,6 @@ sys.path.append('/home/shenhm/doucments/lm-watermarking/watermark_reliability_re
 
 from normalizers import normalization_strategy_lookup
 from alternative_prf_schemes import prf_lookup, seeding_scheme_lookup
-
 import numpy as np
 import hashlib
 
@@ -34,17 +33,12 @@ fixed_table = torch.randperm(
 
 # 用于将输入的整数张量转换为另一个整数张量，类似于哈希操作（本质上就是最简单的一种哈希，设置一个足够大的table_size然后取模)
 # 利用一个预定义的固定查找表（fixed_table）对输入进行映射，从而实现一种简单且高效的哈希功能。
-def hashint_to_bin(integer_tensor: torch.LongTensor) -> torch.Tensor:
+def hashint(integer_tensor: torch.LongTensor) -> torch.Tensor:
     """将整数张量映射为 32 位二进制比特串"""
     # 计算哈希值
-    hash_value = fixed_table[integer_tensor.cpu() % table_size] + 1  # 保证值大于 0
-    
-    # 将哈希值转换为 32 位的二进制字符串
-    # 使用 format 将整数转换为 32 位二进制格式，确保长度为 32 位
-    binary_str = [format(val.item(), '032b') for val in hash_value]
+    fixed_table[integer_tensor.cpu() % table_size] + 1  # 保证值大于 0
 
-    # 返回一个字符串的张量，表示 32 位的二进制比特串
-    return torch.tensor([[int(bit) for bit in bin_str] for bin_str in binary_str], device=integer_tensor.device)
+    return fixed_table[integer_tensor.cpu() % table_size] + 1
 
 def custom_hash(K, dim):
     str_K = str(K)
@@ -68,10 +62,10 @@ class WatermarkBase:
         seeding_scheme: str = "simple_1",
         select_green_tokens: bool = True,  # should always be the default if not running in legacy mode
         #########LSH#########
-        n_hashes: int = 5,               # LSH的哈希函数数量，决定了有多少个桶
-        n_features: int = 32 ,            # 每个哈希函数的维度
+        n_hashes: int = 4,               # LSH的哈希函数数量，决定了有多少个桶
         threshold_len = 0,
-        threshold=0.2,
+        threshold=0.5,
+        visualization=False,
     ):
         # patch now that None could now maybe be passed as seeding_scheme
 
@@ -90,23 +84,30 @@ class WatermarkBase:
         # LSH相关初始化
         self.threshold_len = threshold_len
         self.n_hashes = n_hashes
-        self.n_features = n_features
-        self.projection_matrix = self._generate_random_projection()
+        # self.projection_matrix = self._generate_random_projection()
         self.lsh_tables = []  # 存储哈希表
-        self.token_embeddings = {}  # 存储token的嵌入向量
-        self.token_signatures = {}  # 存储token的LSH签名
         self.threshold = threshold
-        self.index_len = 32
         self.hash_key = 15485863
-        self.hash_table_ins = self.generate_hash_table_binary_array()
+        self.visualization = visualization
+        # self.hash_table_ins = self.generate_hash_table_binary_array()
 
-    # def precompute_token_hashes(self):
-    #     """预计算整个词表中所有 token 的哈希值并保存在 self.token_embeddings 中。"""
-    #     # 遍历词表中的所有 token，并计算其哈希值
-    #     for token in self.vocab:
-    #         if token not in self.token_embeddings:
-    #             # 计算并缓存每个 token 的哈希值
-    #         self.token_embeddings[token] = custom_hash(token, self.n_features)
+    def hash_table_binary_array(self,seed):
+        # 计算应该有多少个 1
+        K = self.vocab_size // (2 ** self.n_hashes) 
+        num_ones = int(K * self.gamma)
+        # 生成一个长度为 K 的全 0 数组
+
+        binary_array = torch.zeros(K, dtype=torch.int)
+        reserse_binary_array  = torch.zeros(K, dtype=torch.int)
+        torch.manual_seed(seed) 
+        # 随机选择 num_ones 个位置设为 1
+        ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
+        res_ones_indices = torch.randperm(K)[-num_ones:] 
+        # 将选择的位置设置为 1
+        binary_array[ones_indices] = 1
+        reserse_binary_array[res_ones_indices] = 1
+
+        return binary_array
             
     def _initialize_seeding_scheme(self, seeding_scheme: str) -> None:
         """Initialize all internal settings of the seeding strategy from a colloquial, "public" name for the scheme."""
@@ -114,50 +115,28 @@ class WatermarkBase:
             seeding_scheme
         )
 
-    def _generate_random_projection(self,):
-        """生成一个随机投影矩阵"""
-        # 使用 torch 来生成标准正态分布的随机矩阵
-        return torch.randn(self.n_features, self.n_features, generator=rng)
-
-    def _hash_function(self, point, projection_matrix):
-        """基于随机投影生成哈希值"""
-        # point 1,32 10,32
-        projected = torch.matmul(point.float(), projection_matrix.to(point.device))
-        return torch.ge(projected, 0).int()  # 返回-1或1
-
-    
-    def generate_hash_table_binary_array(self):
-        # 计算应该有多少个 1
-        K = self.vocab_size // (2 ** self.n_hashes) 
-        num_ones = int(K * self.gamma)
-        # 生成一个长度为 K 的全 0 数组
-        hash_table_ins = {}
-        for hash_table_id in range(2**self.n_hashes):
-            binary_array = torch.zeros(K, dtype=torch.int)
-            reserse_binary_array  = torch.zeros(K, dtype=torch.int)
-            torch.manual_seed(hash_table_id) 
-            # 随机选择 num_ones 个位置设为 1
-            ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
-            res_ones_indices = torch.randperm(K)[-num_ones:] 
-            # 将选择的位置设置为 1
-            binary_array[ones_indices] = 1
-            reserse_binary_array[res_ones_indices] = 1
-            hash_table_ins[hash_table_id] = {"binary_array":binary_array,"reserse_binary_array":reserse_binary_array}
-        return hash_table_ins
-    
-
-    def proj_LSH_Space(self,input_ids: torch.LongTensor,):
-        all_signatures = set()
-        embed_ids = hashint_to_bin(input_ids) 
-        for embed_id in embed_ids:
-            signature = self._hash_function(embed_id, self.projection_matrix)
-            all_signatures.add(signature)
+    def proj_LSH_Space(self,input_ids,next_token):
+        from collections import defaultdict
+        sign_visual = defaultdict(list)  # 使用字典记录哈希表ID和对应的input_ids
+        input_ids = input_ids.to(next_token.device)
+        all_signatures = (input_ids * self.hash_key * next_token) % (2 ** self.n_hashes) # simply hash
+ 
+        # for idx, item in enumerate(input_ids):
+        #     signature = (item * self.hash_key * next_token) % (2 ** self.n_hashes)
+        #     sign_visual[int(signature)].append(int(item)) 
         indices = []
+        # hash_table_info = []  # 存储每个哈希表的信息
+        # 计算每个哈希表的分块范围
+        num_hash_tables = 2 ** self.n_hashes
+        # block_size = self.vocab_size // num_hash_tables
+
         for hash_table_id in range(2**self.n_hashes):
-            if hash_table_id in all_signatures:
-                indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
+
+            activated = hash_table_id in all_signatures
+            if activated:
+                indices.append(self.hash_table_binary_array(hash_table_id))
             else:
-                indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token))
 
         extended_indices = torch.cat(indices)
         if extended_indices.size(0) > self.vocab_size:
@@ -166,7 +145,48 @@ class WatermarkBase:
             padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
             extended_indices = torch.cat([extended_indices, padding])
         return extended_indices.to(input_ids.device)
+    
+    def proj_LSH_Space_info(self,input_ids,next_token):
+        from collections import defaultdict
+        sign_visual = defaultdict(list)  # 使用字典记录哈希表ID和对应的input_ids
+        input_ids = input_ids.to(next_token.device)
+        all_signatures = (input_ids * self.hash_key * next_token) % (2 ** self.n_hashes) # simply hash
+ 
+        for idx, item in enumerate(input_ids):
+            signature = (item * self.hash_key * next_token) % (2 ** self.n_hashes)
+            sign_visual[int(signature)].append(int(item)) 
+        indices = []
+        hash_table_info = []  # 存储每个哈希表的信息
+        # 计算每个哈希表的分块范围
+        num_hash_tables = 2 ** self.n_hashes
+        block_size = self.vocab_size // num_hash_tables
 
+        for hash_table_id in range(2**self.n_hashes):
+            start = hash_table_id * block_size
+            end = (hash_table_id + 1) * block_size if hash_table_id != num_hash_tables -1 else self.vocab_size
+            token_range = (start, end)
+            
+            activated = hash_table_id in all_signatures
+            if activated:
+                indices.append(self.hash_table_binary_array(hash_table_id))
+            else:
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token))
+
+            hash_table_info.append({
+                "hash_table_id": hash_table_id,
+                "activated": activated,
+                "input_ids": sign_visual.get(hash_table_id, []),
+                "token_range": token_range,
+                "block_size": block_size,
+            })
+
+        extended_indices = torch.cat(indices)
+        if extended_indices.size(0) > self.vocab_size:
+            extended_indices = extended_indices[:self.vocab_size]
+        elif extended_indices.size(0) < self.vocab_size:
+            padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
+            extended_indices = torch.cat([extended_indices, padding])
+        return extended_indices.to(input_ids.device), hash_table_info
 
     def _seed_rng(self, next_token: torch.LongTensor) -> None:
         """Seed RNG from local context. Not batched, because the generators we use (like cuda.random) are not batched."""
@@ -175,40 +195,47 @@ class WatermarkBase:
 
 
     def find_ids_within_percentile(self, ids: torch.LongTensor, fixed_id: int, threshold: float) -> torch.LongTensor:
-        """
-        返回与指定ID距离最近的百分之threshold的ID（基于距离分位数动态确定阈值）
 
-        参数:
-            ids (torch.LongTensor): 待搜索的ID张量（1维）
-            fixed_id (int): 作为参照的固定ID
-            threshold (float): 百分比阈值（0-100），例如20表示最近的20%的ID
-
-        返回:
-            torch.LongTensor: 满足条件的所有ID组成的张量，按距离升序排列
-
-        示例:
-            >>> ids = torch.LongTensor([5, 2, 8, 3, 10])
-            >>> find_ids_within_percentile(ids, fixed_id=5, threshold=20)
-            tensor([5])  # 距离最近的20%的ID（1个）
-        """
         if len(ids) == 0 or threshold <= 0:
             return torch.empty(0, dtype=torch.long)
+        if len(ids) <=4:
+            return ids
         
-        # 计算距离并排序
-        distances = torch.abs(ids - fixed_id)
-        sorted_distances, sorted_indices = torch.sort(distances)
-        
-        # 计算需选择的ID数量
         k = int(round(len(ids) * threshold ))
-        k = max(1, min(k, len(ids)))  # 保证至少选择1个
-        
-        # 动态确定距离阈值（包含所有相同距离的ID）
-        max_distance = sorted_distances[k-1]
-        mask = distances <= max_distance
-        
-        # 按距离升序返回结果
-        return ids[sorted_indices][:torch.sum(mask).item()]
+        k = max(4, min(k, len(ids)))  # 保证至少选择4个
 
+        distances = hashint(ids*fixed_id*self.hash_key)
+        sorted_distances, sorted_indices = torch.sort(distances)
+
+        return ids[sorted_indices][:k]
+    def visualize_mask_origin(self,next_token_id, hash_table_info, vocab_size):
+        # 确定哈希表ID和分块位置
+
+        next_token_id = int(next_token_id[0])
+        for info in hash_table_info:
+            start, end = info["token_range"]
+            if start <= next_token_id < end:
+                hash_table_id = info["hash_table_id"]
+                pos_in_block = next_token_id - start
+                block_size = info["block_size"]
+                activated = info["activated"]
+                input_ids = info["input_ids"]
+                break
+        
+        # 获取对应哈希表的binary_array
+        # binary_array = self.hash_table_ins[hash_table_id]["binary_array"]
+        # mask_value = binary_array[pos_in_block] if activated else 1 - binary_array[pos_in_block]
+        
+        # 输出结果
+        print(f"Next Token ID: {next_token_id}")
+        print(f"所属哈希表ID: {hash_table_id}")
+        print(f"哈希表范围: [{start}, {end})")
+        print(f"在分块中的位置: {pos_in_block}")
+        print(f"哈希表是否被激活: {activated}")
+        print(f"影响该哈希表的Input IDs: {input_ids}")
+        # print(f"掩码值: {mask_value.item()} (1表示允许，0表示拒绝)")
+        return {"activated":activated,"input_ids":input_ids }
+    
     def _get_greenlist_ids(self, input_ids: torch.LongTensor, next_token:torch.LongTensor) -> torch.LongTensor:
         """根据本地上下文宽度生成随机数种子,并使用这些信息生成绿色列表的ID。"""
         # 1. 首先根据输入的上下文设置随机数种子
@@ -222,13 +249,32 @@ class WatermarkBase:
             select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
         else:
             select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
-        
-        extended_indices = self.proj_LSH_Space(input_ids=select_ids)
-        # 
+
+        if self.visualization:
+            extended_indices, hash_table_info   = self.proj_LSH_Space_info(input_ids=select_ids,next_token=next_token)
+        else:
+            extended_indices = self.proj_LSH_Space(input_ids=select_ids,next_token=next_token)
+
+        pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
+
+        position = torch.where(pointwise_results == next_token)[0]
+        if input_ids.shape[-1] > self.threshold_len and position.numel() != 0:
+            info = self.visualize_mask_origin(
+                next_token_id=position,
+                hash_table_info=hash_table_info,
+                vocab_size=self.vocab_size
+            )
+        else:
+            info = None
+
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
         # 4. 选择绿色token
         if self.select_green_tokens:  # 直接选择
             greenlist_ids = vocab_permutation[pointwise_results > 0] 
+
+        if self.visualization:
+            return greenlist_ids,info
+        
         return greenlist_ids
     
 
@@ -327,7 +373,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 final_greenlist.append(prediction_candidate)
             # What follows below are optional early-stopping rules for efficiency
             if tail_rule == "fixed_score":
-                if len(final_greenlist) == 10:
+                if len(final_greenlist) == 50:
                     break
                 # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
@@ -441,7 +487,7 @@ class WatermarkDetector(WatermarkBase):
         self.device = device
         self.z_threshold = z_threshold
         self.rng = torch.Generator(device=self.device)
-        self.visual = False
+
         self.normalizers = []
         for normalization_strategy in normalizers:
             self.normalizers.append(normalization_strategy_lookup(normalization_strategy))
@@ -523,7 +569,7 @@ class WatermarkDetector(WatermarkBase):
         # 计算当前token的签名
         signature = self._hash_function(embed_id, self.projection_matrix)
         input_ids_hash_table.append(copy.deepcopy(all_signatures))  # 保留当前token使用的签名集合
-
+        # pdb.set_trace()
         # 使用前面几个token的签名为当前token生成红绿词表
         indices = []
         for hash_table_id in range(2**self.n_hashes):
@@ -695,10 +741,15 @@ class WatermarkDetector(WatermarkBase):
                     f"the first min_prefix_len={self.min_prefix_len} tokens required by the seeding scheme."
                 )
             )
-        green_token_count, green_token_mask = 0, []
+        green_token_count, green_token_mask, green_info = 0, [],[]
+        
         for idx in range(self.threshold_len, len(input_ids)):
             curr_token = input_ids[idx]
-            greenlist_ids = self._get_greenlist_ids(input_ids[:idx],input_ids[idx])
+            if self.visualization:
+                greenlist_ids,info = self._get_greenlist_ids(input_ids[:idx],input_ids[idx])
+                green_info.append(info)
+            else:
+                greenlist_ids = self._get_greenlist_ids(input_ids[:idx],input_ids[idx])
             if curr_token in greenlist_ids:
                 green_token_count += 1
                 green_token_mask.append(True)
@@ -708,15 +759,10 @@ class WatermarkDetector(WatermarkBase):
 
         # HF-style output dictionary
         # 更新字典内容
-        # print(green_token_mask)
-        # 假设 tokenizer 已经是你所用的 tokenizer 实例
-        if self.visual:
-            pos = [
-                [value, self.tokenizer.decode([int(input_ids[index])])]  # 解码 input_ids[index]
-                for index, value in enumerate(green_token_mask) ]
-
-        # print(pos)
-        # print("detector inputids",input_ids)
+        print(green_token_mask)
+        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
+        print(pos)
+        print("detector inputids",input_ids)
 
         score_dict = dict()
         if return_num_tokens_scored:
@@ -734,9 +780,11 @@ class WatermarkDetector(WatermarkBase):
             if z_score is None:
                 z_score = self._compute_z_score(green_token_count, num_tokens_scored)
             score_dict.update(dict(p_value=self._compute_p_value(z_score)))
-        if self.visual:
-            score_dict.update(dict(green_token_mask=pos))
-        
+        if return_green_token_mask:
+            score_dict.update(dict(green_token_mask=green_token_mask))
+            
+        if self.visualization:
+            score_dict.update(dict(info=green_info))
         # if return_z_at_T:
         #     # Score z_at_T separately:
         #     sizes = torch.arange(1, len(green_unique) + 1)
@@ -820,7 +868,6 @@ class WatermarkDetector(WatermarkBase):
                     output_dict[key] = float(value)
 
         return output_dict
-
 
 # 这段代码实现了生成n-grams的功能，即将输入的sequence序列划分为n个元素为一组的子序列（n-grams）。
 # 它支持对序列进行填充（pad）操作，能够在序列的两端（左端或右端）填充指定的符

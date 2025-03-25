@@ -175,7 +175,6 @@ def main(args):
             gamma=args.gamma,
             delta=args.delta,
             n_hashes=args.n_hashes,
-            n_features=args.n_features,
             threshold=args.threshold,
             seeding_scheme=args.seeding_scheme,
             store_spike_ents=args.store_spike_ents,

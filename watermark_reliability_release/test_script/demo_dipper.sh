@@ -1,10 +1,10 @@
 
 #!/bin/bash
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=6
 
-PATH_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width__skipgram_wikit_ff-additive_prf-4-True-15485863
-L=20
-O=20
+PATH_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/ours3_0/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_0.3_LSH_v3.0_c4
+O=60
+L=60
 
 # python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
 #     --data_path="$PATH_DIR""/gen_table.jsonl" \
