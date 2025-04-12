@@ -25,42 +25,34 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-6-True-15485863/gen_table_dipper_O60_L60.jsonl_z_score",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/windows_text/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6__0.25_LSH_H_6_c4/gen_table_deepseek_attacker.jsonl_z_score",
         help="Path to the data file containing the z-scores"
     )
     return parser.parse_args()
 
 def load_z_scores(file_path):
     data = []
-    attack_data = []
-    attack_data_path = "/home/shenhm/documents/temp/kwg_h_6_spoofing_fake-news_8.25_new.jsonl_z_score"
-    with open(attack_data_path , 'r', encoding='utf-8') as file:
-        for line in file:
-            attack_data.append(json.loads(line.strip()))
-
     with open(file_path, 'r', encoding='utf-8') as file:
         for line in file:
             data.append(json.loads(line.strip()))
 
     # Assuming 'w_wm_output_z_score' and 'no_wm_output_z_score' are the relevant keys
-    human_z_scores = [entry.get('w_wm_output_attacked_z_score', math.nan) for entry in attack_data]
+    human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data]
     # w_wm_output_attacked_z_score  w_wm_output_z_score
-    machine_z_scores = [entry.get('w_wm_output_z_score', math.nan) for entry in data]
-    import pdb
-
+    machine_z_scores = [entry.get('w_wm_output_attacked_z_score', math.nan) for entry in data]
     return human_z_scores, machine_z_scores
 
-# def load_z_scores_2(file_path):
-#     data = []
-#     with open(file_path, 'r', encoding='utf-8') as file:
-#         for line in file:
-#             data.append(json.loads(line.strip()))
+def load_z_scores_2(file_path):
+    data = []
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            data.append(json.loads(line.strip()))
 
-#     # Assuming 'w_wm_output_z_score' and 'no_wm_output_z_score' are the relevant keys
-#     human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data]
-#     # w_wm_output_attacked_z_score  w_wm_output_z_score
-#     machine_z_scores = [entry.get('w_wm_output_z_score', math.nan) for entry in data]
-#     return human_z_scores, machine_z_scores
+    # Assuming 'w_wm_output_z_score' and 'no_wm_output_z_score' are the relevant keys
+    human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data]
+    # w_wm_output_attacked_z_score  w_wm_output_z_score
+    machine_z_scores = [entry.get('w_wm_output_z_score', math.nan) for entry in data]
+    return human_z_scores, machine_z_scores
 
 def get_roc_auc(human_z, machine_z):
     assert len(human_z) == len(machine_z)
@@ -119,7 +111,7 @@ def main():
 
         # First run
         print("Processing first z-scores...")
-        human_z, machine_z = load_z_scores(args.data_path)
+        human_z, machine_z = load_z_scores_2(args.data_path)
 
         # Clean NaN values from z-scores
         human_z, machine_z = clean_z_scores(human_z, machine_z)
@@ -145,6 +137,37 @@ def main():
         result_file.write(f"TPR (FPR = 5%): {tpr_value5}\n")
         
         result_file.write('#' * 50 + "\n")
+
+        # Second run
+        print("Processing second z-scores...")
+        human_z, machine_z = load_z_scores(args.data_path)
+
+        # Clean NaN values from z-scores
+        human_z, machine_z = clean_z_scores(human_z, machine_z)
+
+        # Calculate AUC-ROC and TPR values
+        roc_auc, fpr, tpr, _ = get_roc_auc(human_z, machine_z)
+        print(f"ROC AUC: {roc_auc}")
+        result_file.write(f"ROC AUC: {roc_auc}\n")
+
+        # TPR (FPR = 0%)
+        tpr_value0 = get_tpr(fpr, tpr, 0.0)
+        print(f"TPR (FPR = 0%): {tpr_value0}")
+        result_file.write(f"TPR (FPR = 0%): {tpr_value0}\n")
+
+        # TPR (FPR = 1%)
+        tpr_value1 = get_tpr(fpr, tpr, 0.01)
+        print(f"TPR (FPR = 1%): {tpr_value1}")
+        result_file.write(f"TPR (FPR = 1%): {tpr_value1}\n")
+
+        # TPR (FPR = 5%)
+        tpr_value5 = get_tpr(fpr, tpr, 0.05)
+        print(f"TPR (FPR = 5%): {tpr_value5}")
+        result_file.write(f"TPR (FPR = 5%): {tpr_value5}\n")
+
+        result_file.write('#' * 50 + "\n")
+
+    print(f"Results saved to: {result_file_path}")
 
     #     # Second run
     #     print("Processing second z-scores...")

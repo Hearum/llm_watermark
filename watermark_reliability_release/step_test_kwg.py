@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import collections
 from math import sqrt
@@ -13,7 +12,7 @@ from transformers import LogitsProcessor
 import sys
 import pdb
 # 添加新的搜索路径
-sys.path.append('/home/shenhm/doucments/lm-watermarking/watermark_reliability_release')
+sys.path.append('/home/shenhm/documents/lm-watermarking/watermark_reliability_release')
 
 from normalizers import normalization_strategy_lookup
 from alternative_prf_schemes import prf_lookup, seeding_scheme_lookup
@@ -30,16 +29,13 @@ fixed_table = torch.randperm(
     1_000_003, device=torch.device("cpu"), generator=rng
 )  # actually faster than I thought
 
-# 用于将输入的整数张量转换为另一个整数张量，类似于哈希操作（本质上就是最简单的一种哈希，设置一个足够大的table_size然后取模)
-# 利用一个预定义的固定查找表（fixed_table）对输入进行映射，从而实现一种简单且高效的哈希功能。
-def hashint_to_bin(integer_tensor: torch.LongTensor) -> torch.Tensor:
+
+def hashint(integer_tensor: torch.LongTensor) -> torch.Tensor:
     """将整数张量映射为 32 位二进制比特串"""
     # 计算哈希值
-    hash_value = fixed_table[integer_tensor.cpu() % table_size] + 1  # 保证值大于 0
-    
-    # 将哈希值转换为 32 位的二进制字符串
-    # 使用 format 将整数转换为 32 位二进制格式，确保长度为 32 位
-    binary_str = [format(val.item(), '032b') for val in hash_value]
+    fixed_table[integer_tensor.cpu() % table_size] + 1  # 保证值大于 0
+
+    return fixed_table[integer_tensor.cpu() % table_size] + 1
 
     # 返回一个字符串的张量，表示 32 位的二进制比特串
     return torch.tensor([[int(bit) for bit in bin_str] for bin_str in binary_str], device=integer_tensor.device)
@@ -70,6 +66,8 @@ class WatermarkBase:
         n_features: int = 32 ,            # 每个哈希函数的维度
         threshold_len = 0,
         threshold=0.2,
+        windows_h_uesd = False,
+        visualization=False,
     ):
         # patch now that None could now maybe be passed as seeding_scheme
 
@@ -86,17 +84,20 @@ class WatermarkBase:
         self.select_green_tokens = select_green_tokens
 
         # LSH相关初始化
+
         self.threshold_len = threshold_len
         self.n_hashes = n_hashes
-        self.n_features = n_features
-        self.projection_matrix = self._generate_random_projection()
+        # self.projection_matrix = self._generate_random_projection()
         self.lsh_tables = []  # 存储哈希表
-        self.token_embeddings = {}  # 存储token的嵌入向量
-        self.token_signatures = {}  # 存储token的LSH签名
         self.threshold = threshold
-        self.index_len = 32
         self.hash_key = 15485863
-        self.hash_table_ins = self.generate_hash_table_binary_array()
+        self.visualization = visualization
+        # self.hash_table_ins = self.generate_hash_table_binary_array()
+
+        # 开启水印窗口的功能
+        self.windows_h_uesd = windows_h_uesd
+        if not self.windows_h_uesd:
+            self.threshold_len = 0
 
     # def precompute_token_hashes(self):
     #     """预计算整个词表中所有 token 的哈希值并保存在 self.token_embeddings 中。"""
@@ -111,51 +112,46 @@ class WatermarkBase:
         self.prf_type, self.context_width, self.self_salt, self.hash_key = seeding_scheme_lookup(
             seeding_scheme
         )
-
-    def _generate_random_projection(self,):
-        """生成一个随机投影矩阵"""
-        # 使用 torch 来生成标准正态分布的随机矩阵
-        return torch.randn(self.n_features, self.n_features, generator=rng)
-
-    def _hash_function(self, point, projection_matrix):
-        """基于随机投影生成哈希值"""
-        # point 1,32 10,32
-        projected = torch.matmul(point.float(), projection_matrix.to(point.device))
-        return torch.ge(projected, 0).int()  # 返回-1或1
-
-    
-    def generate_hash_table_binary_array(self):
+    def hash_table_binary_array(self,seed):
         # 计算应该有多少个 1
         K = self.vocab_size // (2 ** self.n_hashes) 
         num_ones = int(K * self.gamma)
         # 生成一个长度为 K 的全 0 数组
-        hash_table_ins = {}
-        for hash_table_id in range(2**self.n_hashes):
-            binary_array = torch.zeros(K, dtype=torch.int)
-            reserse_binary_array  = torch.zeros(K, dtype=torch.int)
-            torch.manual_seed(hash_table_id) 
-            # 随机选择 num_ones 个位置设为 1
-            ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
-            res_ones_indices = torch.randperm(K)[-num_ones:] 
-            # 将选择的位置设置为 1
-            binary_array[ones_indices] = 1
-            reserse_binary_array[res_ones_indices] = 1
-            hash_table_ins[hash_table_id] = {"binary_array":binary_array,"reserse_binary_array":reserse_binary_array}
-        return hash_table_ins
-    
 
-    def proj_LSH_Space(self,input_ids: torch.LongTensor,):
-        all_signatures = set()
-        embed_ids = hashint_to_bin(input_ids) 
-        for embed_id in embed_ids:
-            signature = self._hash_function(embed_id, self.projection_matrix)
-            all_signatures.add(signature)
+        binary_array = torch.zeros(K, dtype=torch.int)
+        reserse_binary_array  = torch.zeros(K, dtype=torch.int)
+        torch.manual_seed(seed) 
+        # 随机选择 num_ones 个位置设为 1
+        ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
+        res_ones_indices = torch.randperm(K)[-num_ones:] 
+        # 将选择的位置设置为 1
+        binary_array[ones_indices] = 1
+        reserse_binary_array[res_ones_indices] = 1
+
+        return binary_array
+    def proj_LSH_Space(self,input_ids,next_token):
+        from collections import defaultdict
+        sign_visual = defaultdict(list)  # 使用字典记录哈希表ID和对应的input_ids
+        input_ids = input_ids.to(next_token.device)
+        all_signatures = (input_ids * self.hash_key * next_token) % (self.n_hashes) # simply hash
+ 
+        # for idx, item in enumerate(input_ids):
+        #     signature = (item * self.hash_key * next_token) % (2 ** self.n_hashes)
+        #     sign_visual[int(signature)].append(int(item)) 
         indices = []
+        # hash_table_info = []  # 存储每个哈希表的信息
+        # 计算每个哈希表的分块范围
+        num_hash_tables = self.n_hashes
+        # block_size = self.vocab_size // num_hash_tables
+
         for hash_table_id in range(2**self.n_hashes):
-            if hash_table_id in all_signatures:
-                indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
+
+            activated = hash_table_id in all_signatures
+            if activated:
+                indices.append(self.hash_table_binary_array(hash_table_id))
             else:
-                indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token))
+
         extended_indices = torch.cat(indices)
         if extended_indices.size(0) > self.vocab_size:
             extended_indices = extended_indices[:self.vocab_size]
@@ -164,47 +160,69 @@ class WatermarkBase:
             extended_indices = torch.cat([extended_indices, padding])
         return extended_indices.to(input_ids.device)
 
+    def proj_LSH_Space_info(self,input_ids,next_token):
+        from collections import defaultdict
+        sign_visual = defaultdict(list)  # 使用字典记录哈希表ID和对应的input_ids
+        input_ids = input_ids.to(next_token.device)
+        all_signatures = (input_ids * self.hash_key * next_token) % (self.n_hashes) # simply hash
+ 
+        for idx, item in enumerate(input_ids):
+            signature = (item * self.hash_key * next_token) % (self.n_hashes)
+            sign_visual[int(signature)].append(int(item)) 
+        indices = []
+        hash_table_info = []  # 存储每个哈希表的信息
+        # 计算每个哈希表的分块范围
+        num_hash_tables = self.n_hashes
+        block_size = self.vocab_size // num_hash_tables
 
+        for hash_table_id in range(2**self.n_hashes):
+            start = hash_table_id * block_size
+            end = (hash_table_id + 1) * block_size if hash_table_id != num_hash_tables -1 else self.vocab_size
+            token_range = (start, end)
+            
+            activated = hash_table_id in all_signatures
+            if activated:
+                indices.append(self.hash_table_binary_array(hash_table_id))
+            else:
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token))
+
+            hash_table_info.append({
+                "hash_table_id": hash_table_id,
+                "activated": activated,
+                "input_ids": sign_visual.get(hash_table_id, []),
+                "token_range": token_range,
+                "block_size": block_size,
+            })
+
+        extended_indices = torch.cat(indices)
+        if extended_indices.size(0) > self.vocab_size:
+            extended_indices = extended_indices[:self.vocab_size]
+        elif extended_indices.size(0) < self.vocab_size:
+            padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
+            extended_indices = torch.cat([extended_indices, padding])
+        return extended_indices.to(input_ids.device), hash_table_info
+    
     def _seed_rng(self, next_token: torch.LongTensor) -> None:
         """Seed RNG from local context. Not batched, because the generators we use (like cuda.random) are not batched."""
         prf_key = next_token* self.hash_key 
         self.rng.manual_seed(prf_key.item() % (2**64 - 1)) 
 
 
+
     def find_ids_within_percentile(self, ids: torch.LongTensor, fixed_id: int, threshold: float) -> torch.LongTensor:
-        """
-        返回与指定ID距离最近的百分之threshold的ID（基于距离分位数动态确定阈值）
 
-        参数:
-            ids (torch.LongTensor): 待搜索的ID张量（1维）
-            fixed_id (int): 作为参照的固定ID
-            threshold (float): 百分比阈值（0-100），例如20表示最近的20%的ID
-
-        返回:
-            torch.LongTensor: 满足条件的所有ID组成的张量，按距离升序排列
-
-        示例:
-            >>> ids = torch.LongTensor([5, 2, 8, 3, 10])
-            >>> find_ids_within_percentile(ids, fixed_id=5, threshold=20)
-            tensor([5])  # 距离最近的20%的ID（1个）
-        """
         if len(ids) == 0 or threshold <= 0:
             return torch.empty(0, dtype=torch.long)
+        if len(ids) <=4:
+            return ids
         
-        # 计算距离并排序
-        distances = torch.abs(ids - fixed_id)
-        sorted_distances, sorted_indices = torch.sort(distances)
-        
-        # 计算需选择的ID数量
         k = int(round(len(ids) * threshold ))
-        k = max(1, min(k, len(ids)))  # 保证至少选择1个
-        
-        # 动态确定距离阈值（包含所有相同距离的ID）
-        max_distance = sorted_distances[k-1]
-        mask = distances <= max_distance
-        
-        # 按距离升序返回结果
-        return ids[sorted_indices][:torch.sum(mask).item()]
+        k = max(4, min(k, len(ids)))  # 保证至少选择4个
+
+        distances = hashint(ids*fixed_id*self.hash_key)
+        sorted_distances, sorted_indices = torch.sort(distances)
+
+        return ids[sorted_indices][:k]
 
     def _get_greenlist_ids(self, input_ids: torch.LongTensor, next_token:torch.LongTensor) -> torch.LongTensor:
         """根据本地上下文宽度生成随机数种子,并使用这些信息生成绿色列表的ID。"""
@@ -214,13 +232,18 @@ class WatermarkBase:
             self.vocab_size, 
             device=input_ids.device,
             generator=self.rng)
+        # if self.windows_h_uesd:
+        #     if input_ids.shape[-1] < self.threshold_len:
+        #         select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
+        #     else:
+        #         select_ids = self.find_ids_within_percentile(ids=input_ids[-self.threshold_len:],fixed_id=next_token,threshold=1) 
+        # else:
+        #     if input_ids.shape[-1] < self.threshold_len:
+        #         select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
+        #     else:
+        #         select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
         
-        if input_ids.shape[-1] < self.threshold_len:
-            select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
-        else:
-            select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
-        
-        extended_indices = self.proj_LSH_Space(input_ids=select_ids)
+        extended_indices = self.proj_LSH_Space(input_ids=input_ids[-self.threshold_len:],next_token=next_token)
         # 
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
         # 4. 选择绿色token
@@ -328,9 +351,9 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                     break
                 # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
-                    if len(final_greenlist)< 1 :
-                        print(self.rejection_count,len(final_greenlist) ,sorted_scores[0] - sorted_scores[idx + 1],False)
-                        self.rejection_count = self.rejection_count+1
+                    # if len(final_greenlist)< 1 :
+                    #     print(self.rejection_count,len(final_greenlist) ,sorted_scores[0] - sorted_scores[idx + 1],False)
+                    #     self.rejection_count = self.rejection_count+1
                     break
             elif tail_rule == "fixed_list_length":
                 if len(final_greenlist) == 10:
@@ -393,24 +416,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
 
 
 class WatermarkDetector(WatermarkBase):
-    """This is the detector for all watermarks imprinted with WatermarkLogitsProcessor.
 
-    The detector needs to be given the exact same settings that were given during text generation  to replicate the watermark
-    greenlist generation and so detect the watermark.
-    This includes the correct device that was used during text generation, the correct tokenizer, the correct
-    seeding_scheme name, and parameters (delta, gamma).
-
-    Optional arguments are
-    * normalizers ["unicode", "homoglyphs", "truecase"] -> These can mitigate modifications to generated text that could trip the watermark
-    * ignore_repeated_ngrams -> This option changes the detection rules to count every unique ngram only once.
-    * z_threshold -> Changing this threshold will change the sensitivity of the detector.
-
-    该检测器需要提供与文本生成时完全相同的设置，以便复制水印绿色列表的生成，从而检测水印。这些设置包括生成时使用的正确设备、
-    正确的分词器、正确的 seeding_scheme 名称以及相关参数 delta、gamma。
-    normalizers ["unicode", "homoglyphs", "truecase"] -> 这些可以缓解生成文本中的修改，避免干扰水印检测。
-    ignore_repeated_ngrams -> 该选项修改检测规则,只统计每个唯一的n-gram一次。
-    z_threshold -> 改变该阈值将调整检测器的敏感度。
-    """
 
     def __init__(
         self,
@@ -520,7 +526,7 @@ class WatermarkDetector(WatermarkBase):
         # 计算当前token的签名
         signature = self._hash_function(embed_id, self.projection_matrix)
         input_ids_hash_table.append(copy.deepcopy(all_signatures))  # 保留当前token使用的签名集合
-        pdb.set_trace()
+
         # 使用前面几个token的签名为当前token生成红绿词表
         indices = []
         for hash_table_id in range(2**self.n_hashes):
@@ -557,69 +563,6 @@ class WatermarkDetector(WatermarkBase):
         return all_signatures, greenlist_ids_table,input_ids_hash_table
 
 
-    def detect_LSH_Space(self,input_ids: torch.LongTensor,):
-
-        embed_ids = hashint_to_bin(input_ids) 
-        # 获得一个和input_ids一样大小的哈希签名串
-        all_signatures = set()
-        input_ids_hash_table = []
-        greenlist_ids_table =[]
-        greenlist_mask = []
-        for idx, embed_id in enumerate(embed_ids):
-            #pdb.set_trace()
-            if idx < self.threshold_len:     # 跳过签名没有水印的部分 0 1 2 3 4 5
-                signature = self._hash_function(embed_id, self.projection_matrix)
-                input_ids_hash_table.append(set()) # 用于保存第idx的token前面的的签名是什么
-                all_signatures.add(signature) # 动态添加的签名表
-                greenlist_ids_table.append([])
-                continue
-
-            # 从第5个开始的文本就具有水印了
-            # 使用前面几个token的文本
-
-            # 使用前面的几个token的签名为当前token生成红绿词表
-            #all_signatures, greenlist_ids_table,input_ids_hash_table = self.generate_greenlist(idx, embed_id, input_ids, all_signatures, greenlist_ids_table, input_ids_hash_table)
-            if all_signatures in input_ids_hash_table:
-                position = input_ids_hash_table.index(all_signatures)
-                greenlist_ids = greenlist_ids_table[position]
-            else:
-                indices = []
-                for hash_table_id in range(2**self.n_hashes):
-                    if hash_table_id in all_signatures:
-                        indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
-                    else:
-                        indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
-                extended_indices = torch.cat(indices)
-                if extended_indices.size(0) > self.vocab_size:
-                    extended_indices = extended_indices[:self.vocab_size]
-                elif extended_indices.size(0) < self.vocab_size:
-                    padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
-                    extended_indices = torch.cat([extended_indices, padding])
-                extended_indices = extended_indices.to(input_ids.device)
-
-                self._seed_rng(input_ids[idx])
-                vocab_permutation = torch.randperm(
-                            self.vocab_size, 
-                            device=input_ids.device,
-                            generator=self.rng)
-                pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
-                if self.select_green_tokens:  # 直接选择
-                    greenlist_ids = vocab_permutation[pointwise_results > 0] 
-                else:  # 通过红色token反选模式
-                    greenlist_ids = vocab_permutation[pointwise_results <= 0] 
-
-                if input_ids[idx] in greenlist_ids:
-                    greenlist_mask.append(True)
-                else:
-                    greenlist_mask.append(False)
-
-            input_ids_hash_table.append(copy.deepcopy(all_signatures)) 
-            greenlist_ids_table.append(greenlist_ids)
-            # 添加当前token的签名到集合内
-            signature = self._hash_function(embed_id, self.projection_matrix)
-            all_signatures.add(signature) # jia
-        assert len(all_signatures)==len(input_ids)
-        return all_signatures, greenlist_ids_table, input_ids_hash_table, greenlist_mask
 
     def _score_sequence_old(
         self,
@@ -706,10 +649,10 @@ class WatermarkDetector(WatermarkBase):
 
         # HF-style output dictionary
         # 更新字典内容
-        print(green_token_mask)
-        pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
-        print(pos)
-        print("detector inputids",input_ids)
+        # print(green_token_mask)
+        # pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
+        # print(pos)
+        # print("detector inputids",input_ids)
 
         score_dict = dict()
         if return_num_tokens_scored:
@@ -1028,12 +971,13 @@ def test_detector():
     for key, value in result.items():
         print(f"{key}: {value}")
 
+ 
 def test_no_watermark_test():
 
-    # 指定可见的 GPU 设备
+   # 指定可见的 GPU 设备
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     # 初始化 Accelerator
-    args = Args(gamma=0.25, delta=2.0, max_new_tokens=100, use_sampling=False, sampling_temp=0.9, n_beams=3)
+    args = Args(gamma=0.25, delta=2.0, max_new_tokens=200, use_sampling=False, sampling_temp=0.9, n_beams=3)
 
     tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
     model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True,device_map = "auto")
@@ -1045,7 +989,7 @@ def test_no_watermark_test():
     
     # 创建 WatermarkLogitsProcessor
     from datasets import load_dataset
-    prompt = raw_datasets = load_dataset('openai/openai_humaneval',split='test')['prompt'][0] 
+    prompt = "long long ago, there is a kingdom. please write a passage more than 300 words." #raw_datasets = load_dataset('openai/openai_humaneval',split='test')['prompt'][0] 
     # "As with previous Valkyira Chronicles games , Valkyria Chronicles III is a tactical role @-@ playing game where players take control of a military unit and take part in missions against enemy forces . Stories are told through comic book @-@ like panels with"
     #prompt = " Opsies handel stelsel resensies , restaurant Italiaanse vertaler binere kode se rysisusogapyniqyh.j.pl Home forex t1220 General Electric hotforex gereguleerde boks waar kan ek bele 'n klein bedrag geld tipes forex orde grootste Japannese forex makelaars Orion Koeweit forex GBP NZD forexpros kafee Friday, October 7, 2016. Forex Diamant Resensies. Oct 04, 2016 · Monday, October 10, 2016."
     # 编码 prompt
@@ -1068,7 +1012,10 @@ def test_no_watermark_test():
                                                     gamma=args.gamma,
                                                     delta=args.delta,
                                                     seeding_scheme=args.seeding_scheme,
-                                                    select_green_tokens=args.select_green_tokens)
+                                                    select_green_tokens=args.select_green_tokens,
+                                                    n_hashes=6,
+                                                    threshold_len=6,
+                                                    windows_h_uesd  = True)          # 每个哈希函数的维度)
     
     '''
     called the land of the gods. The people here live for more than 100 years and their bodies are very healthy. 
@@ -1093,7 +1040,6 @@ def test_no_watermark_test():
     watermark_out = tokenizer.decode(output_w[0,prefix_len:], skip_special_tokens=True)
 
     detector = WatermarkDetector(
-        threshold_len=0,
         gamma=args.gamma,
         delta=args.delta,
         device=device,
@@ -1102,6 +1048,9 @@ def test_no_watermark_test():
         z_threshold=4.0,
         normalizers=["unicode"],
         ignore_repeated_ngrams=False,
+        n_hashes=6,
+        threshold_len=6,
+        windows_h_uesd  = True
     )
     
     result = detector.detect(text=no_watermark_out)
@@ -1112,10 +1061,90 @@ def test_no_watermark_test():
 
     result = detector.detect(text=watermark_out)
     # 输出结果
-    print("no_watermark_out检测结果:")
+    print("watermark_out检测结果:")
     for key, value in result.items():
         print(f"{key}: {value}")
-    print(model.config)
+    # print(model.config)
+    from openai import OpenAI
+    import openai
+    client = OpenAI(api_key="sk-b45d2bf8d14b43019169bae19a6e9d25", base_url="https://api.deepseek.com")
+
+    prompt = "As an expert copy-editor, please rewrite the following text in your own voice while ensuring that the final output contains the same information as the original text and has roughly the same length. Please paraphrase all sentences and do not omit any crucial details. Additionally, please take care to provide any relevant information about public figures, organizations, or other entities mentioned in the text to avoid any potential misunderstandings or biases."
+    attacker_query = prompt + watermark_out 
+    query_msg = {"role": "user", "content": attacker_query}
+    outputs = client.chat.completions.create(model='deepseek-chat', messages=[query_msg], temperature=0.7, max_tokens=350)
+    attacked_text = outputs.choices[0].message.content
+
+    # 输出结果
+    print('#'*50,"attack text",'#'*50)
+    result = detector.detect(text=attacked_text)
+    for key, value in result.items():
+        print(f"{key}: {value}")
+
+def detector_only():
+
+    # 指定可见的 GPU 设备
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # 初始化 Accelerator
+    args = Args(gamma=0.25, delta=2.0, max_new_tokens=200, use_sampling=False, sampling_temp=0.9, n_beams=3)
+
+    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    model = AutoModelForCausalLM.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True,device_map = "auto")
+    device =model.device
+
+    print(f"Generating with {args}")
+    device = torch.device("cuda")
+    torch.manual_seed(48)  
+
+    text = """The EU will be following his lead too. The sooner we can be out of it the better. It will be a much safer place with out it.\nMercosur will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it collapses the better. It will be a much safer place with out it too. The sooner it col"""
+    detector = WatermarkDetector(
+        gamma=args.gamma,
+        delta=args.delta,
+        device=device,
+        tokenizer=tokenizer,
+        vocab=list(tokenizer.get_vocab().values()),
+        z_threshold=4.0,
+        normalizers=["unicode"],
+        ignore_repeated_ngrams=False,
+        n_hashes=6,
+        threshold_len=6,
+        windows_h_uesd  = True
+    )
+    
+    result = detector.detect(text=text)
+    # 输出结果
+
+    print("watermark_out检测结果:")
+    for key, value in result.items():
+        if key != "info":
+            print(f"{key}: {value}")
+
+    all_activated = [item['activated'] for item in result['info'] if item is not None]
+    print(f"SelfHash rate={sum(all_activated)}, Unigran rate={len(all_activated)-sum(all_activated)}")
+
+    len_input_ids = [len(item['input_ids']) for item in result['info'] if item is not None]
+    print(f"advantage rate={sum(len_input_ids)/len(all_activated)}")
+
+
+    # from openai import OpenAI
+    # import openai
+    # client = OpenAI(api_key="sk-m6u0zvn57TSjyOAl59D4D8974dEa48F9999f428f26Ad146f", base_url="https://zmgpt.cc/v1")
+
+    # # prompt = "As an expert copy-editor, please rewrite the following text in your own voice while ensuring that the final output contains the same information as the original text and has roughly the same length. Please paraphrase all sentences and do not omit any crucial details. Additionally, please take care to provide any relevant information about public figures, organizations, or other entities mentioned in the text to avoid any potential misunderstandings or biases."
+    # # attacker_query = prompt + text
+    # # query_msg = {"role": "user", "content": attacker_query}
+    # # outputs = client.chat.completions.create(model='gpt-3.5-turbo', messages=[query_msg], temperature=0.7, max_tokens=350)
+
+
+    # # attacked_text = outputs.choices[0].message.content
+    # text = delete_random_elements(text,0.3)
+    # # 输出结果
+    # print('#'*50,"attack text",'#'*50)
+    # result = detector.detect(text=text)
+    # for key, value in result.items():
+    #     print(f"{key}: {value}")
+
 if __name__ == '__main__':
-    test_no_watermark_test()
+    #test_no_watermark_test()
+    detector_only()
     # test_detector()

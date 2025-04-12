@@ -91,13 +91,36 @@ def anchored_skipgram_prf(input_ids: torch.LongTensor, salt_key: int, anchor: in
 # 原文中的minHash
 # 使用最小值的哈希
 def minhash_prf(input_ids: torch.LongTensor, salt_key: int) -> int:
-    # slightly less not the greatest idea for non-random input ids as in text
     return hashint(salt_key * input_ids).min().item()
 
-# 本质上也是一种minHash,和上面那个不同的点在于，这里是先做hash再找最小值，和我读文章里面想的方法是一样的(实际上用的好像也是这个)
+# 本质上也是一种minHash,和上面那个不同的点在于，这里是先做hash再找最小值，在steal里面想的方法是一样的(实际上用的好像也是这个)
 def anchored_minhash_prf(input_ids: torch.LongTensor, salt_key: int, anchor: int = -1) -> int:
     # Anchor to one key to produce a min over pairs again
     return (salt_key * hashint(input_ids) * hashint(input_ids[anchor])).min().item()
+
+def anchored_minhash_prf4(input_ids: torch.LongTensor, salt_key: int, anchor: int = -1) -> int:
+    # Anchor to one key to produce a min over pairs again
+    return (salt_key * myhashint_4(input_ids) * hashint(input_ids[anchor])).min().item()
+
+def anchored_minhash_prf8(input_ids: torch.LongTensor, salt_key: int, anchor: int = -1) -> int:
+    # Anchor to one key to produce a min over pairs again
+    return (salt_key * myhashint_8(input_ids) * hashint(input_ids[anchor])).min().item()
+
+def anchored_minhash_prf6(input_ids: torch.LongTensor, salt_key: int, anchor: int = -1) -> int:
+    # Anchor to one key to produce a min over pairs again
+    return (salt_key * myhashint_6(input_ids) * hashint(input_ids[anchor])).min().item()
+
+def anchored_minhash_prf16(input_ids: torch.LongTensor, salt_key: int, anchor: int = -1) -> int:
+    # Anchor to one key to produce a min over pairs again
+    return (salt_key * myhashint_16(input_ids) * hashint(input_ids[anchor])).min().item()
+
+def anchored_minhash_prf32(input_ids: torch.LongTensor, salt_key: int, anchor: int = -1) -> int:
+    # Anchor to one key to produce a min over pairs again
+    return (salt_key * myhashint_32(input_ids) * hashint(input_ids[anchor])).min().item()
+
+def anchored_minhash_prf64(input_ids: torch.LongTensor, salt_key: int, anchor: int = -1) -> int:
+    # Anchor to one key to produce a min over pairs again
+    return (salt_key * myhashint_64(input_ids) * hashint(input_ids[anchor])).min().item()
 
 # 生成所有可能的跳跃gram（skipgrams），即从token ID集合中选择两个token ID的组合，应用hashint函数后计算每对的乘积，然后找到这些乘积中的最小值，生成一个整数种子。
 def minskipgram_prf(input_ids: torch.LongTensor, salt_key: int, k: int = 2) -> int:
@@ -131,6 +154,12 @@ prf_lookup = {
     "anchored_skipgram_prf": anchored_skipgram_prf,
     "minhash_prf": minhash_prf,
     "anchored_minhash_prf": anchored_minhash_prf,
+    "anchored_minhash_prf4": anchored_minhash_prf4,
+    "anchored_minhash_prf6": anchored_minhash_prf6,
+    "anchored_minhash_prf8": anchored_minhash_prf8,
+    "anchored_minhash_prf16": anchored_minhash_prf16,
+    "anchored_minhash_prf32": anchored_minhash_prf32,
+    "anchored_minhash_prf64": anchored_minhash_prf64,
     "minskipgram_prf": minskipgram_prf,
     "noncomm_prf": noncomm_prf,
     "position_prf": position_prf,
@@ -151,8 +180,41 @@ def hashint(integer_tensor: torch.LongTensor) -> torch.LongTensor:
     return (
         fixed_table[integer_tensor.cpu() % table_size] + 1
     )  # minor cheat here, this function always return CPU values
+def myhashint_6(integer_tensor: torch.LongTensor) -> torch.LongTensor:
+    """Sane version, in the end we only need a small permutation table."""
+    return (
+        fixed_table[integer_tensor.cpu() % 6] + 1
+    )  # minor cheat here, this function always return CPU values
 
 
+def myhashint_4(integer_tensor: torch.LongTensor) -> torch.LongTensor:
+    """Sane version, in the end we only need a small permutation table."""
+    return (
+        fixed_table[integer_tensor.cpu() % 4] + 1
+    )  # minor cheat here, this function always return CPU values
+    
+def myhashint_8(integer_tensor: torch.LongTensor) -> torch.LongTensor:
+    """Sane version, in the end we only need a small permutation table."""
+    return (
+        fixed_table[integer_tensor.cpu() % 8] + 1
+    )  # minor cheat here, this function always return CPU values
+
+def myhashint_16(integer_tensor: torch.LongTensor) -> torch.LongTensor:
+    """Sane version, in the end we only need a small permutation table."""
+    return (
+        fixed_table[integer_tensor.cpu() % 16] + 1
+    )  # minor cheat here, this function always return CPU values
+def myhashint_32(integer_tensor: torch.LongTensor) -> torch.LongTensor:
+    """Sane version, in the end we only need a small permutation table."""
+    return (
+        fixed_table[integer_tensor.cpu() % 32] + 1
+    )  # minor cheat here, this function always return CPU values
+
+def myhashint_64(integer_tensor: torch.LongTensor) -> torch.LongTensor:
+    """Sane version, in the end we only need a small permutation table."""
+    return (
+        fixed_table[integer_tensor.cpu() % 64] + 1
+    )  # minor cheat here, this function always return CPU values
 def _hashint_avalanche_tensor(integer_tensor: torch.LongTensor):
     """http://burtleburtle.net/bob/hash/integer.html, ported into pytorch, runs on tensors. Apparently a decent avalanche."""
     i = integer_tensor.to(torch.int32).clone()  # or torch.int16?

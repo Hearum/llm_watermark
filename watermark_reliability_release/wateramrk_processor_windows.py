@@ -115,7 +115,7 @@ class WatermarkBase:
         )
     def hash_table_binary_array(self,seed):
         # 计算应该有多少个 1
-        K = self.vocab_size // (2 ** self.n_hashes) 
+        K = self.vocab_size // self.n_hashes
         num_ones = int(K * self.gamma)
         # 生成一个长度为 K 的全 0 数组
 
@@ -145,11 +145,11 @@ class WatermarkBase:
         num_hash_tables = self.n_hashes
         # block_size = self.vocab_size // num_hash_tables
 
-        for hash_table_id in range(2**self.n_hashes):
+        for hash_table_id in range(self.n_hashes):
 
             activated = hash_table_id in all_signatures
             if activated:
-                indices.append(self.hash_table_binary_array(hash_table_id))
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token*hash_table_id))
             else:
                 indices.append(self.hash_table_binary_array(self.hash_key*next_token))
 
@@ -176,14 +176,14 @@ class WatermarkBase:
         num_hash_tables = self.n_hashes
         block_size = self.vocab_size // num_hash_tables
 
-        for hash_table_id in range(2**self.n_hashes):
+        for hash_table_id in range(self.n_hashes):
             start = hash_table_id * block_size
             end = (hash_table_id + 1) * block_size if hash_table_id != num_hash_tables -1 else self.vocab_size
             token_range = (start, end)
             
             activated = hash_table_id in all_signatures
             if activated:
-                indices.append(self.hash_table_binary_array(hash_table_id))
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token*hash_table_id))
             else:
                 indices.append(self.hash_table_binary_array(self.hash_key*next_token))
 
@@ -348,8 +348,8 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 final_greenlist.append(prediction_candidate)
             # What follows below are optional early-stopping rules for efficiency
             if tail_rule == "fixed_score":
-                if len(final_greenlist) == 10:
-                    break
+                # if len(final_greenlist) == 10:
+                #     break
                 # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
                     # if len(final_greenlist)< 1 :
@@ -417,24 +417,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
 
 
 class WatermarkDetector(WatermarkBase):
-    """This is the detector for all watermarks imprinted with WatermarkLogitsProcessor.
 
-    The detector needs to be given the exact same settings that were given during text generation  to replicate the watermark
-    greenlist generation and so detect the watermark.
-    This includes the correct device that was used during text generation, the correct tokenizer, the correct
-    seeding_scheme name, and parameters (delta, gamma).
-
-    Optional arguments are
-    * normalizers ["unicode", "homoglyphs", "truecase"] -> These can mitigate modifications to generated text that could trip the watermark
-    * ignore_repeated_ngrams -> This option changes the detection rules to count every unique ngram only once.
-    * z_threshold -> Changing this threshold will change the sensitivity of the detector.
-
-    该检测器需要提供与文本生成时完全相同的设置，以便复制水印绿色列表的生成，从而检测水印。这些设置包括生成时使用的正确设备、
-    正确的分词器、正确的 seeding_scheme 名称以及相关参数 delta、gamma。
-    normalizers ["unicode", "homoglyphs", "truecase"] -> 这些可以缓解生成文本中的修改，避免干扰水印检测。
-    ignore_repeated_ngrams -> 该选项修改检测规则,只统计每个唯一的n-gram一次。
-    z_threshold -> 改变该阈值将调整检测器的敏感度。
-    """
 
     def __init__(
         self,
@@ -581,69 +564,6 @@ class WatermarkDetector(WatermarkBase):
         return all_signatures, greenlist_ids_table,input_ids_hash_table
 
 
-    def detect_LSH_Space(self,input_ids: torch.LongTensor,):
-
-        embed_ids = hashint_to_bin(input_ids) 
-        # 获得一个和input_ids一样大小的哈希签名串
-        all_signatures = set()
-        input_ids_hash_table = []
-        greenlist_ids_table =[]
-        greenlist_mask = []
-        for idx, embed_id in enumerate(embed_ids):
-            #pdb.set_trace()
-            if idx < self.threshold_len:     # 跳过签名没有水印的部分 0 1 2 3 4 5
-                signature = self._hash_function(embed_id, self.projection_matrix)
-                input_ids_hash_table.append(set()) # 用于保存第idx的token前面的的签名是什么
-                all_signatures.add(signature) # 动态添加的签名表
-                greenlist_ids_table.append([])
-                continue
-
-            # 从第5个开始的文本就具有水印了
-            # 使用前面几个token的文本
-
-            # 使用前面的几个token的签名为当前token生成红绿词表
-            #all_signatures, greenlist_ids_table,input_ids_hash_table = self.generate_greenlist(idx, embed_id, input_ids, all_signatures, greenlist_ids_table, input_ids_hash_table)
-            if all_signatures in input_ids_hash_table:
-                position = input_ids_hash_table.index(all_signatures)
-                greenlist_ids = greenlist_ids_table[position]
-            else:
-                indices = []
-                for hash_table_id in range(2**self.n_hashes):
-                    if hash_table_id in all_signatures:
-                        indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
-                    else:
-                        indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
-                extended_indices = torch.cat(indices)
-                if extended_indices.size(0) > self.vocab_size:
-                    extended_indices = extended_indices[:self.vocab_size]
-                elif extended_indices.size(0) < self.vocab_size:
-                    padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
-                    extended_indices = torch.cat([extended_indices, padding])
-                extended_indices = extended_indices.to(input_ids.device)
-
-                self._seed_rng(input_ids[idx])
-                vocab_permutation = torch.randperm(
-                            self.vocab_size, 
-                            device=input_ids.device,
-                            generator=self.rng)
-                pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
-                if self.select_green_tokens:  # 直接选择
-                    greenlist_ids = vocab_permutation[pointwise_results > 0] 
-                else:  # 通过红色token反选模式
-                    greenlist_ids = vocab_permutation[pointwise_results <= 0] 
-
-                if input_ids[idx] in greenlist_ids:
-                    greenlist_mask.append(True)
-                else:
-                    greenlist_mask.append(False)
-
-            input_ids_hash_table.append(copy.deepcopy(all_signatures)) 
-            greenlist_ids_table.append(greenlist_ids)
-            # 添加当前token的签名到集合内
-            signature = self._hash_function(embed_id, self.projection_matrix)
-            all_signatures.add(signature) # jia
-        assert len(all_signatures)==len(input_ids)
-        return all_signatures, greenlist_ids_table, input_ids_hash_table, greenlist_mask
 
     def _score_sequence_old(
         self,

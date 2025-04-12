@@ -242,11 +242,12 @@ def load_hf_dataset(args):
         if "c4" in dataset_name:
             from datasets import load_dataset
             dataset = load_dataset(
-                'allenai/c4', 
+                'json',  # 这里使用 'json' 表示加载 json 文件
                 data_files='/home/shenhm/documents/downloads/c4-train.00000*-of-00512.json.gz',
                 split='train',
-                streaming=args.stream_dataset,  
-                cache_dir='/tmp/dataset_cache',)
+                streaming=args.stream_dataset,      
+                cache_dir='/tmp/dataset_cache' 
+                )
             args.__dict__.update(
                 {
                     "truncate_input_for_prompt": True,

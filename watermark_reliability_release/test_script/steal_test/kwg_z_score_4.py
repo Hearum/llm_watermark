@@ -1,7 +1,7 @@
 
 import sys
 sys.path.append("/home/shenhm/documents/lm-watermarking/watermark_reliability_release")
-from watermark_processor import WatermarkDetector
+from watermark_processor_kwg import WatermarkDetector
 import os
 import json
 from copy import deepcopy
@@ -27,18 +27,17 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/windows_text/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6__0.25_LSH_H_6_c4/gen_table_dipper_O60_L60.jsonl",
+        default="/home/shenhm/documents/watermark-stealing/out_llama/ours/c4-kgw-ff-anchored_minhash_prf-4-True-15485863/0.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
         "--config_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/windows_text/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6__0.25_LSH_H_6_c4/gen_table_meta.json",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/KWG_TEST/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_meta.json",
     )
     parser.add_argument(
         "--seeding_scheme",
         type=str,
-        default="ff-anchored_minhash_prf-6-True-15485863",
         help="The seeding procedure to use for the watermark.",
     )
     parser.add_argument(
@@ -51,21 +50,6 @@ def parse_args():
         type=float,
         default=4.0,
         help="The test statistic threshold for the detection hypothesis test.",
-    )
-    parser.add_argument(
-        "--n_hashes",
-        type=int,
-        default=5,
-    )    
-    parser.add_argument(
-        "--n_features",
-        type=int,
-        default=32,
-    )    
-    parser.add_argument(
-        "--threshold",
-        type=float,
-        default=0.2,
     )
     # parser.add_argument(
     #     "--normalizers",
@@ -105,14 +89,12 @@ def check_missing_z_scores(data):
         print("\nAll entries have the required z_score fields.")
 from tqdm import tqdm
 import math
-import pdb
-
 def main():
     args = parse_args()
     with open(args.config_path, 'r', encoding='utf-8') as infile:
         config_data = json.load(infile)
-
     tokenizer = AutoTokenizer.from_pretrained(config_data.get('model_name_or_path'),local_files_only=True)
+    
     watermark_detector = WatermarkDetector(
         vocab=list(tokenizer.get_vocab().values()),
         gamma=config_data.get('gamma'),
@@ -122,10 +104,6 @@ def main():
         z_threshold=args.detection_z_threshold,
         # normalizers=args.normalizers,
         ignore_repeated_ngrams=args.ignore_repeated_ngrams,
-        n_hashes = config_data.get('n_hashes'),               # LSH的哈希函数数量，决定了有多少个桶
-        # n_features=config_data.get('n_features'),            # 每个哈希函数的维度
-        threshold=config_data.get('threshold'),
-        visualization=True,
     )
     data = []
     with open(args.data_path, 'r', encoding='utf-8') as file:
@@ -134,10 +112,9 @@ def main():
 
     # 遍历数据并计算 z_score
     for item in tqdm(data):
-        for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output",]:
+        for key in ["textwm"]:
             input_text = item.get(key, "")  # 获取文本内容
             if input_text:  # 确保文本不为空
-                # input_text = input_text[:2000]
                 try:
                     # 调用 watermark_detector.detect 获取 score_dict
                     score_dict = watermark_detector.detect(
@@ -145,41 +122,23 @@ def main():
                                 return_prediction=False,
                                 convert_to_float=True,
                             )
+                    # 获取 z_score，如果没有就设置为 NaN
                     item[f"{key}_z_score"] = score_dict.get("z_score", math.nan)
-                    
-                    # 获取 activated 信息并避免 ZeroDivisionError
-                    info_list = score_dict.get('info', [])
-                    all_activated = [item['activated'] for item in info_list if item is not None]
-                    
-                    # 确保 all_activated 不是空列表，避免除零错误
-                    if all_activated:
-                        item[f"activated_rate"] = sum(all_activated) / len(all_activated)
-                    else:
-                        item[f"activated_rate"] = math.nan  # 如果没有激活信息，设置为 NaN
-
-                    # 获取 input_ids 的长度并计算 advantage_token_protect
-                    len_input_ids = [len(item['input_ids']) for item in info_list if item is not None]
-                    
-                    # 确保 len_input_ids 不是空列表，避免除零错误
-                    if len_input_ids and len(all_activated):
-                        item[f"advantage_token_protect"] = sum(len_input_ids) / len(all_activated)
-                    else:
-                        item[f"advantage_token_protect"] = math.nan  # 如果没有数据，设置为 NaN
-
-                    # 计算 no_activated_rate
-                    item[f"no_activated_rate"] = 1 - item.get(f"activated_rate", math.nan)
-                    
                 except ValueError as e:
                     # 捕获 ValueError 异常，并将 z_score 设置为 NaN
                     if "Must have at least 1 token" in str(e):
                         item[f"{key}_z_score"] = math.nan
                     else:
                         raise  # 如果是其他 ValueError 异常，重新抛出
+    pdb.set_trace()
+    np.nanmean(np.array([item["textwm_z_score"] for item in data]))
+    
     # 写回 JSONL 文件
-    with open(args.data_path+'_z_score', 'w', encoding='utf-8') as file:
+    path = "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/steal_test"+'/z_score'
+    with open(path, 'w', encoding='utf-8') as file:
         for item in data:
             file.write(json.dumps(item, ensure_ascii=False) + "\n")
-    print(f"Updated JSONL file saved to: {args.data_path+'_z_score'}")
+    print(f"Updated JSONL file saved to: {path}")
 
 if __name__ == '__main__':
     main()

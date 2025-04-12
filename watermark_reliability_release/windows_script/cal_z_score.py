@@ -1,7 +1,7 @@
 
 import sys
 sys.path.append("/home/shenhm/documents/lm-watermarking/watermark_reliability_release")
-from lsh_windws_step import WatermarkDetector
+from wateramrk_processor_windows import WatermarkDetector
 
 import os
 import json
@@ -114,17 +114,23 @@ def main():
     #     config_data = json.load(infile)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    with open(args.config_path, 'r', encoding='utf-8') as infile:
+        config_data = json.load(infile)
+
+    tokenizer = AutoTokenizer.from_pretrained(config_data.get('model_name_or_path'),local_files_only=True)
     watermark_detector = WatermarkDetector(
-        gamma=0.25,
-        delta=4.0,
-        device=device,
-        tokenizer=tokenizer,
         vocab=list(tokenizer.get_vocab().values()),
-        z_threshold=4.0,
-        normalizers=["unicode"],
-        ignore_repeated_ngrams=False,
-        threshold_len=16,
-        windows_h_uesd  = True
+        gamma=config_data.get('gamma'),
+        seeding_scheme=config_data.get('seeding_scheme'),
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        tokenizer=tokenizer,
+        z_threshold=args.detection_z_threshold,
+        # normalizers=args.normalizers,
+        ignore_repeated_ngrams=args.ignore_repeated_ngrams,
+        n_hashes = config_data.get('n_hashes'),               # LSH的哈希函数数量，决定了有多少个桶
+        # n_features=config_data.get('n_features'),            # 每个哈希函数的维度
+        threshold=config_data.get('threshold'),
+        visualization=True,
     )
     data = []
     with open(args.data_path, 'r', encoding='utf-8') as file:
@@ -133,7 +139,7 @@ def main():
 
     # 遍历数据并计算 z_score
     for item in tqdm(data):
-        for key in ["textwm"]:
+        for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output",]:
             input_text = item.get(key, "")  # 获取文本内容
             if input_text:  # 确保文本不为空
                 # input_text = input_text[:2000]

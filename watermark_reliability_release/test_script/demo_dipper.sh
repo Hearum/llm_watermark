@@ -1,8 +1,8 @@
 
 #!/bin/bash
-export CUDA_VISIBLE_DEVICES=6
+export CUDA_VISIBLE_DEVICES=3
 
-PATH_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/ours3_0/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_0.3_LSH_v3.0_c4
+PATH_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/Our_test/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4
 O=60
 L=60
 

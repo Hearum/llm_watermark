@@ -188,6 +188,7 @@ def main(args):
                                                         delta=args.delta,
                                                         seeding_scheme=args.seeding_scheme,
                                                         select_green_tokens=True,
+                                                        n_hashes=args.n_hashes,
                                                         threshold_len=args.h_win,
                                                         windows_h_uesd=True)  
     else:

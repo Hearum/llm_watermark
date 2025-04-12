@@ -1,7 +1,7 @@
 
 import sys
 sys.path.append("/home/shenhm/documents/lm-watermarking/watermark_reliability_release")
-from lsh_windws_step import WatermarkDetector
+from wateramrk_processor_windows import WatermarkDetector
 
 import os
 import json
@@ -28,13 +28,13 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_100/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_5_32_0.2_LSH_v2.2_c4_new/gen_table_dipper_O60_L60.jsonl",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/windows_text/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6__0.25_LSH_H_6_c4/gen_table_deepseek_attacker.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
         "--config_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_4_32_0.2_LSH_v2.2_c4_new/gen_table_meta.json",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/windows_text/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6__0.25_LSH_H_6_c4/gen_table_meta.json",
     )
     parser.add_argument(
         "--seeding_scheme",
@@ -114,16 +114,34 @@ def main():
     #     config_data = json.load(infile)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    with open(args.config_path, 'r', encoding='utf-8') as infile:
+        config_data = json.load(infile)
+    # watermark_detector = WatermarkDetector(
+    #     gamma=args.gamma,
+    #     delta=args.delta,
+    #     device=device,
+    #     tokenizer=tokenizer,
+    #     vocab=list(tokenizer.get_vocab().values()),
+    #     z_threshold=4.0,
+    #     normalizers=["unicode"],
+    #     ignore_repeated_ngrams=False,
+    #     threshold_len=16,
+    #     windows_h_uesd  = True
+    # )
     watermark_detector = WatermarkDetector(
-        gamma=args.gamma,
-        delta=args.delta,
-        device=device,
-        tokenizer=tokenizer,
         vocab=list(tokenizer.get_vocab().values()),
-        z_threshold=4.0,
-        normalizers=["unicode"],
-        ignore_repeated_ngrams=False,
-        threshold_len=16,
+        gamma=config_data.get('gamma'),
+        seeding_scheme=config_data.get('seeding_scheme'),
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        tokenizer=tokenizer,
+        z_threshold=args.detection_z_threshold,
+        # normalizers=args.normalizers,
+        ignore_repeated_ngrams=args.ignore_repeated_ngrams,
+        n_hashes = config_data.get('n_hashes'),               # LSH的哈希函数数量，决定了有多少个桶
+        # n_features=config_data.get('n_features'),            # 每个哈希函数的维度
+        threshold=config_data.get('threshold'),
+        visualization=True,
+        threshold_len=config_data.get('h_win'),
         windows_h_uesd  = True
     )
     data = []
@@ -133,7 +151,7 @@ def main():
 
     # 遍历数据并计算 z_score
     for item in tqdm(data):
-        for key in ["textwm"]:
+        for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output",]:
             input_text = item.get(key, "")  # 获取文本内容
             if input_text:  # 确保文本不为空
                 # input_text = input_text[:2000]
@@ -146,6 +164,35 @@ def main():
                             )
                     # 获取 z_score，如果没有就设置为 NaN
                     item[f"{key}_z_score"] = score_dict.get("z_score", math.nan)
+                    
+                    # 获取 activated 信息并避免 ZeroDivisionError
+                    info_list = score_dict.get('info', [])
+                    all_activated = [item['activated'] for item in info_list if item is not None]
+                    
+                    # 确保 all_activated 不是空列表，避免除零错误
+                    if all_activated:
+                        item[f"activated_rate"] = sum(all_activated) / len(all_activated)
+                    else:
+                        item[f"activated_rate"] = math.nan  # 如果没有激活信息，设置为 NaN
+
+                    # 获取 input_ids 的长度并计算 advantage_token_protect
+                    len_input_ids = [len(item['input_ids']) for item in info_list if item is not None]
+                    
+                    # 确保 len_input_ids 不是空列表，避免除零错误
+                    if len_input_ids and len(all_activated):
+                        item[f"{key}_advantage_token_protect"] = sum(len_input_ids) / len(all_activated)
+                    else:
+                        item[f"{key}_advantage_token_protect"] = math.nan  # 如果没有数据，设置为 NaN
+
+                    # 计算 no_activated_rate
+                    item[f"{key}_no_activated_rate"] = 1 - item.get(f"activated_rate", math.nan)
+                    
+                except ValueError as e:
+                    # 捕获 ValueError 异常，并将 z_score 设置为 NaN
+                    if "Must have at least 1 token" in str(e):
+                        item[f"{key}_z_score"] = math.nan
+                    else:
+                        raise  # 如果是其他 ValueError 异常，重新抛出
                 except ValueError as e:
                     # 捕获 ValueError 异常，并将 z_score 设置为 NaN
                     if "Must have at least 1 token" in str(e):

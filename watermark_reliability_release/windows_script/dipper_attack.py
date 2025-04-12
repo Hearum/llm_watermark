@@ -96,10 +96,10 @@ def dipper_attacker(
     if "w_wm_output_attacked" not in dd:
         # paraphrase_outputs = {}
 
-        if isinstance(dd['textwm'], str):
-            input_gen = dd['textwm'].strip()
+        if isinstance(dd["w_wm_output"], str):
+            input_gen = dd["w_wm_output"].strip()
         else:
-            input_gen = dd['textwm'][0].strip()
+            input_gen = dd["w_wm_output"][0].strip()
 
         # The lexical and order diversity codes used by the actual model correspond to "similarity" rather than "diversity".
         # Thus, for a diversity measure of X, we need to use control code value of 100 - X.
@@ -109,7 +109,7 @@ def dipper_attacker(
         # remove spurious newlines
         input_gen = " ".join(input_gen.split())
         sentences = sent_tokenize(input_gen)
-        prefix = " ".join(dd['prompt'].replace("\n", " ").split())
+        prefix = " ".join(dd["truncated_input"].replace("\n", " ").split())
         output_text = ""
         final_input_text = ""
 
