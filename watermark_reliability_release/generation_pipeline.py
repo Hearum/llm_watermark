@@ -175,7 +175,7 @@ def main(args):
             gamma=args.gamma,
             delta=args.delta,
             n_hashes=args.n_hashes,
-            threshold=args.threshold,
+            threshold_len=args.h_win,
             seeding_scheme=args.seeding_scheme,
             store_spike_ents=args.store_spike_ents,
             select_green_tokens=True,

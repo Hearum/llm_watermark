@@ -121,12 +121,14 @@ def main():
         tokenizer=tokenizer,
         z_threshold=args.detection_z_threshold,
         # normalizers=args.normalizers,
+        threshold_len=config_data.get('h_win'),
         ignore_repeated_ngrams=args.ignore_repeated_ngrams,
         n_hashes = config_data.get('n_hashes'),               # LSH的哈希函数数量，决定了有多少个桶
         # n_features=config_data.get('n_features'),            # 每个哈希函数的维度
         threshold=config_data.get('threshold'),
         visualization=True,
     )
+
     data = []
     with open(args.data_path, 'r', encoding='utf-8') as file:
         for line in file:

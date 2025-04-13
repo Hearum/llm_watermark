@@ -1,6 +1,6 @@
 import torch
 
-
+# 单次插入攻击
 def single_insertion(
     attack_len,
     min_token_count,
@@ -20,7 +20,7 @@ def single_insertion(
 
     return tokenized_no_wm_output_cloned
 
-
+# 三次插入攻击（等长）
 def triple_insertion_single_len(
     attack_len,
     min_token_count,
@@ -53,7 +53,7 @@ def triple_insertion_single_len(
 
     return tokenized_no_wm_output_cloned
 
-
+# K 次插入攻击（通用）
 def k_insertion_t_len(
     num_insertions,
     insertion_len,

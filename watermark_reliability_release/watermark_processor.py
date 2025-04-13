@@ -93,7 +93,7 @@ class WatermarkBase:
 
     def hash_table_binary_array(self,seed):
         # 计算应该有多少个 1
-        K = self.vocab_size // (2 ** self.n_hashes) 
+        K = self.vocab_size // (self.n_hashes) 
         num_ones = int(K * self.gamma)
         # 生成一个长度为 K 的全 0 数组
 
@@ -119,7 +119,7 @@ class WatermarkBase:
         from collections import defaultdict
         sign_visual = defaultdict(list)  # 使用字典记录哈希表ID和对应的input_ids
         input_ids = input_ids.to(next_token.device)
-        all_signatures = (input_ids * self.hash_key * next_token) % (2 ** self.n_hashes) # simply hash
+        all_signatures = (input_ids * self.hash_key * next_token) % (self.n_hashes) # simply hash
  
         # for idx, item in enumerate(input_ids):
         #     signature = (item * self.hash_key * next_token) % (2 ** self.n_hashes)
@@ -127,10 +127,10 @@ class WatermarkBase:
         indices = []
         # hash_table_info = []  # 存储每个哈希表的信息
         # 计算每个哈希表的分块范围
-        num_hash_tables = 2 ** self.n_hashes
+        num_hash_tables = self.n_hashes
         # block_size = self.vocab_size // num_hash_tables
 
-        for hash_table_id in range(2**self.n_hashes):
+        for hash_table_id in range(self.n_hashes):
 
             activated = hash_table_id in all_signatures
             if activated:
@@ -150,18 +150,18 @@ class WatermarkBase:
         from collections import defaultdict
         sign_visual = defaultdict(list)  # 使用字典记录哈希表ID和对应的input_ids
         input_ids = input_ids.to(next_token.device)
-        all_signatures = (input_ids * self.hash_key * next_token) % (2 ** self.n_hashes) # simply hash
+        all_signatures = (input_ids * self.hash_key * next_token) % (self.n_hashes) # simply hash
  
         for idx, item in enumerate(input_ids):
-            signature = (item * self.hash_key * next_token) % (2 ** self.n_hashes)
+            signature = (item * self.hash_key * next_token) % ( self.n_hashes)
             sign_visual[int(signature)].append(int(item)) 
         indices = []
         hash_table_info = []  # 存储每个哈希表的信息
         # 计算每个哈希表的分块范围
-        num_hash_tables = 2 ** self.n_hashes
+        num_hash_tables =  self.n_hashes
         block_size = self.vocab_size // num_hash_tables
 
-        for hash_table_id in range(2**self.n_hashes):
+        for hash_table_id in range(self.n_hashes):
             start = hash_table_id * block_size
             end = (hash_table_id + 1) * block_size if hash_table_id != num_hash_tables -1 else self.vocab_size
             token_range = (start, end)
@@ -194,16 +194,11 @@ class WatermarkBase:
         self.rng.manual_seed(prf_key.item() % (2**64 - 1)) 
 
 
-    def find_ids_within_percentile(self, ids: torch.LongTensor, fixed_id: int, threshold: float) -> torch.LongTensor:
+    def find_ids_within_percentile(self, ids: torch.LongTensor, fixed_id: int, threshold_len) -> torch.LongTensor:
 
-        if len(ids) == 0 or threshold <= 0:
+        if len(ids) == 0 or threshold_len <= 0:
             return torch.empty(0, dtype=torch.long)
-        if len(ids) <=4:
-            return ids
-        
-        k = int(round(len(ids) * threshold ))
-        k = max(4, min(k, len(ids)))  # 保证至少选择4个
-
+        k = threshold_len
         distances = hashint(ids*fixed_id*self.hash_key)
         sorted_distances, sorted_indices = torch.sort(distances)
 
@@ -245,10 +240,12 @@ class WatermarkBase:
             device=input_ids.device,
             generator=self.rng)
         
-        if input_ids.shape[-1] < self.threshold_len:
-            select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
-        else:
-            select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
+        # if input_ids.shape[-1] < self.threshold_len:
+        #     select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
+        # else:
+        #     select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
+
+        select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold_len=self.threshold_len) 
 
         if self.visualization:
             extended_indices, hash_table_info   = self.proj_LSH_Space_info(input_ids=select_ids,next_token=next_token)
@@ -258,14 +255,16 @@ class WatermarkBase:
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
 
         position = torch.where(pointwise_results == next_token)[0]
-        if input_ids.shape[-1] > self.threshold_len and position.numel() != 0:
-            info = self.visualize_mask_origin(
-                next_token_id=position,
-                hash_table_info=hash_table_info,
-                vocab_size=self.vocab_size
-            )
-        else:
-            info = None
+
+        if self.visualization:
+            if input_ids.shape[-1] > self.threshold_len and position.numel() != 0:
+                info = self.visualize_mask_origin(
+                    next_token_id=position,
+                    hash_table_info=hash_table_info,
+                    vocab_size=self.vocab_size
+                )
+            else:
+                info = None
 
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
         # 4. 选择绿色token
@@ -572,7 +571,7 @@ class WatermarkDetector(WatermarkBase):
         # pdb.set_trace()
         # 使用前面几个token的签名为当前token生成红绿词表
         indices = []
-        for hash_table_id in range(2**self.n_hashes):
+        for hash_table_id in range(self.n_hashes):
             if hash_table_id in all_signatures:
                 indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
             else:
@@ -633,7 +632,7 @@ class WatermarkDetector(WatermarkBase):
                 greenlist_ids = greenlist_ids_table[position]
             else:
                 indices = []
-                for hash_table_id in range(2**self.n_hashes):
+                for hash_table_id in range(self.n_hashes):
                     if hash_table_id in all_signatures:
                         indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
                     else:
@@ -738,7 +737,7 @@ class WatermarkDetector(WatermarkBase):
             raise ValueError(
                 (
                     f"Must have at least {1} token to score after "
-                    f"the first min_prefix_len={self.min_prefix_len} tokens required by the seeding scheme."
+                    f"the first min_prefix_len tokens required by the seeding scheme."
                 )
             )
         green_token_count, green_token_mask, green_info = 0, [],[]

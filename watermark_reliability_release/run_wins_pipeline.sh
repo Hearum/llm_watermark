@@ -5,10 +5,10 @@ export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_rel
 export HF_ENDPOINT=https://hf-mirror.com
 
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=1
 
 MODEL_NAME=llama_7B
-DATASET=c4
+DATASET=wikitext 
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
 #     --dataset_name=c4
@@ -17,10 +17,10 @@ DATASET=c4
 DELTA=5
 GAMMA=0.25
 
-N_HASHES=32
+N_HASHES=6
 THRESHOLD=0.25
 GENERATE_LEN=250
-H=32
+H=6
 
 # LLAMA 13b /home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-13b-hf/snapshots/5c31dfb671ce7cfe2d7bb7c04375e44c55e815b1
 # LLAMA 7b /home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9
@@ -54,7 +54,7 @@ python generation_pipeline.py \
     --dataset_config_name=wikitext-103-raw-v1  \
     --max_new_tokens=100 \
     --model_max_generation_tokens=200 \
-    --min_generations=50 \
+    --min_generations=500 \
     --input_truncation_strategy=prompt_length \
     --min_prompt_tokens=100 \
     --input_filtering_strategy=prompt_and_completion_length \

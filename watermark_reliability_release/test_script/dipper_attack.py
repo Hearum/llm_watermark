@@ -200,7 +200,6 @@ def main():
             if i < processed_count:  # 如果当前行已经处理过，则跳过
                 print(i)
                 continue
-            pdb.set_trace()
             data_item = json.loads(line.strip())  # 读取并解析每一行数据
             if data_item["w_wm_output_length"] < 50:
                 print(data_item["w_wm_output_length"],"is too short, pass")

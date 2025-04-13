@@ -16,8 +16,8 @@ DATASET=c4
 # codeparrot
 DELTA=5
 GAMMA=0.25
-
-N_HASHES=6
+H=12
+N_HASHES=12
 THRESHOLD=0.3
 GENERATE_LEN=150
 
@@ -42,8 +42,8 @@ fi
 
 
 
-OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/${DATASET}/ours3_0/len_${GENERATE_LEN}
-RUN_NAME=${MODEL_NAME}_N500_T200_no_filter_batch_1_delta_${DELTA}_gamma_${GAMMA}_LshParm_${N_HASHES}_${THRESHOLD}_LSH_v3.0_${DATASET}
+OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/${DATASET}/Ours_full/len_${GENERATE_LEN}
+RUN_NAME=${MODEL_NAME}_N500_T200_no_filter_batch_1_delta_${DELTA}_gamma_${GAMMA}_LshParm_${H}_${N_HASHES}_LSH_v3.0_${DATASET}
 
 GENERATION_OUTPUT_DIR="$OUTPUT_DIR"/"$RUN_NAME"
 echo "Running generation pipeline with output dir: $GENERATION_OUTPUT_DIR"
@@ -54,7 +54,7 @@ python generation_pipeline.py \
     --dataset_config_name=wikitext-103-raw-v1  \
     --max_new_tokens=150 \
     --model_max_generation_tokens=200 \
-    --min_generations=500 \
+    --min_generations=50 \
     --input_truncation_strategy=prompt_length \
     --min_prompt_tokens=100 \
     --input_filtering_strategy=prompt_and_completion_length \
@@ -69,9 +69,10 @@ python generation_pipeline.py \
     --verbose=True \
     --output_dir=$GENERATION_OUTPUT_DIR \
     --model_name_or_path $MODEL_PATH  \
-    --generation_batch_size 16 \
-    --LSH=True
-
+    --generation_batch_size 1 \
+    --LSH=True \
+    --LSH_windows=False \
+    --h_win=$H  \
 
 O=60
 L=60
