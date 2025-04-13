@@ -5,10 +5,10 @@ export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_rel
 export HF_ENDPOINT=https://hf-mirror.com
 
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 MODEL_NAME=llama_7B
-DATASET=wikitext 
+DATASET=c4
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
 #     --dataset_name=c4
@@ -75,45 +75,45 @@ python generation_pipeline.py \
     --h_win=$H  \
 
 
-O=60
-L=60
+# O=60
+# L=60
 
-python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
-    --data_path="$GENERATION_OUTPUT_DIR""/gen_table.jsonl" \
-    --o $O \
-    --l $L \
+# python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
+#     --data_path="$GENERATION_OUTPUT_DIR""/gen_table.jsonl" \
+#     --o $O \
+#     --l $L \
 
-if [[ "$GENERATION_OUTPUT_DIR" == *"KWG"* ]]; then
-    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_kwg.py \
-        --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O"$O"_L"$L".jsonl" \
-        --config_path="$GENERATION_OUTPUT_DIR""/gen_table_meta.json" 
-else
-    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score.py \
-        --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O"$O"_L"$L".jsonl" \
-        --config_path="$GENERATION_OUTPUT_DIR""/gen_table_meta.json" 
-fi
+# if [[ "$GENERATION_OUTPUT_DIR" == *"KWG"* ]]; then
+#     python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_kwg.py \
+#         --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O"$O"_L"$L".jsonl" \
+#         --config_path="$GENERATION_OUTPUT_DIR""/gen_table_meta.json" 
+# else
+#     python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score.py \
+#         --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O"$O"_L"$L".jsonl" \
+#         --config_path="$GENERATION_OUTPUT_DIR""/gen_table_meta.json" 
+# fi
 
-python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_auc_roc.py \
-    --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O${O}_L${L}.jsonl_z_score" 
+# python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_auc_roc.py \
+#     --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O${O}_L${L}.jsonl_z_score" 
 
 
-O=20
-L=20
+# O=20
+# L=20
 
-python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
-    --data_path="$GENERATION_OUTPUT_DIR""/gen_table.jsonl" \
-    --o $O \
-    --l $L \
+# python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
+#     --data_path="$GENERATION_OUTPUT_DIR""/gen_table.jsonl" \
+#     --o $O \
+#     --l $L \
 
-if [[ "$GENERATION_OUTPUT_DIR" == *"KWG"* ]]; then
-    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_kwg.py \
-        --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O"$O"_L"$L".jsonl" \
-        --config_path="$GENERATION_OUTPUT_DIR""/gen_table_meta.json" 
-else
-    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score.py \
-        --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O"$O"_L"$L".jsonl" \
-        --config_path="$GENERATION_OUTPUT_DIR""/gen_table_meta.json" 
-fi
+# if [[ "$GENERATION_OUTPUT_DIR" == *"KWG"* ]]; then
+#     python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_kwg.py \
+#         --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O"$O"_L"$L".jsonl" \
+#         --config_path="$GENERATION_OUTPUT_DIR""/gen_table_meta.json" 
+# else
+#     python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score.py \
+#         --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O"$O"_L"$L".jsonl" \
+#         --config_path="$GENERATION_OUTPUT_DIR""/gen_table_meta.json" 
+# fi
 
-python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_auc_roc.py \
-    --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O${O}_L${L}.jsonl_z_score" 
+# python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_auc_roc.py \
+#     --data_path="$GENERATION_OUTPUT_DIR""/gen_table_dipper_O${O}_L${L}.jsonl_z_score" 

@@ -7,7 +7,7 @@ import sklearn.metrics as metrics
 import argparse  
 import json
 import math
-
+import pdb
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -40,6 +40,7 @@ def load_z_scores(file_path):
     human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data]
     # w_wm_output_attacked_z_score  w_wm_output_z_score
     machine_z_scores = [entry.get('w_wm_output_attacked_z_score', math.nan) for entry in data]
+    
     return human_z_scores, machine_z_scores
 
 def load_z_scores_2(file_path):

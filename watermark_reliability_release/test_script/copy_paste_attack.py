@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/Mistral_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
@@ -64,7 +64,7 @@ def parse_args():
     parser.add_argument("--cp_attack_num_insertions", type=int, default=3,
                         help="Number of insertions to perform (only for k-t attack)")
     # 最小 token 数要求，用于判断样本是否足够长才能攻击
-    parser.add_argument("--cp_attack_min_len", type=int, default=200,
+    parser.add_argument("--cp_attack_min_len", type=int, default=150,
                         help="Minimum token count required for an example to be attacked")
     parser.add_argument("--verbose", action="store_true",
                         help="Whether to print detailed debug info during attack")
@@ -230,13 +230,6 @@ def copy_paste_attack(example, tokenizer, args=None):
     # check if the example is long enough to attack
     assert tokenizer is not None, "tokenizer must be provided"
     example = tokenize_for_copy_paste(example=example,tokenizer=tokenizer)
-    # 检查样本是否足够长，否则就跳过攻击。
-    if not check_output_column_lengths(example, min_len=200):
-        # # if not, copy the orig w_wm_output to w_wm_output_attacked
-        # NOTE changing this to return "" so that those fail/we can filter out these examples
-        example["w_wm_output_attacked"] = ""
-        example["w_wm_output_attacked_length"] = 0
-        return example
 
     # else, attack
     # Understanding the functionality:
@@ -329,17 +322,17 @@ def main():
     with open(input_path, 'r', encoding='utf-8') as infile, \
         open(output_path, 'a', encoding='utf-8') as outfile:
         for i, line in enumerate(tqdm(infile, desc="Processing samples", initial=processed_count, total=total_lines)):
-            if i < processed_count:  # 如果当前行已经处理过，则跳过
-                print(i)
-                continue
+            # if i < processed_count:  # 如果当前行已经处理过，则跳过
+            #     print(i)
+            #     continue
             data_item = json.loads(line.strip())  # 读取并解析每一行数据
             if data_item["w_wm_output_length"] < 50:
                 print(data_item["w_wm_output_length"],"is too short, pass")
                 continue
-            updated_item = copy_paste_attack(example=data_item,tokenizer=tokenizer,args=args) 
-
-            # del updated_item['no_wm_output_tokd']
-            # del updated_item['w_wm_output_tokd']
+            if check_output_column_lengths(data_item, min_len=args.cp_attack_min_len):
+                updated_item = copy_paste_attack(example=data_item,tokenizer=tokenizer,args=args) 
+            else:
+                continue
 
             for col in OUTPUT_TEXT_COLUMN_NAMES:
                 key = f"{col}_tokd"

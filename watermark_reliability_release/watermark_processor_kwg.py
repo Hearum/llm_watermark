@@ -319,6 +319,7 @@ class WatermarkDetector(WatermarkBase):
         p_value = scipy.stats.norm.sf(z)
         return p_value
 
+    # 判断一个 n-gram（由 prefix 和 target 构成）是否是“绿色”。使用 @lru_cache 缓存结果，避免重复计算。
     @lru_cache(maxsize=2**32)
     def _get_ngram_score_cached(self, prefix: tuple[int], target: int):
         """Expensive re-seeding and sampling is cached."""
@@ -326,6 +327,7 @@ class WatermarkDetector(WatermarkBase):
         greenlist_ids = self._get_greenlist_ids(torch.as_tensor(prefix, device=self.device))
         return True if target in greenlist_ids else False
 
+    # 提取输入文本中的所有 n-gram，并为每个 n-gram 标记是否带水印。
     def _score_ngrams_in_passage(self, input_ids: torch.Tensor):
         """Core function to gather all ngrams in the input and compute their watermark."""
         if len(input_ids) - self.context_width < 1:
@@ -336,10 +338,12 @@ class WatermarkDetector(WatermarkBase):
 
         # Compute scores for all ngrams contexts in the passage:
         token_ngram_generator = ngrams(
-            input_ids.cpu().tolist(), self.context_width + 1 - self.self_salt
+            input_ids.cpu().tolist(), self.context_width + 1 - self.self_salt # self.self_sal代表（self-seeding）的机制，如果为 True，则包含整个 n-gram；否则只取前缀
         )
-        frequencies_table = collections.Counter(token_ngram_generator)
+
+        frequencies_table = collections.Counter(token_ngram_generator) # 统计每种 n-gram 出现次数。
         ngram_to_watermark_lookup = {}
+
         for idx, ngram_example in enumerate(frequencies_table.keys()):
             prefix = ngram_example if self.self_salt else ngram_example[:-1]
             target = ngram_example[-1]
@@ -376,6 +380,7 @@ class WatermarkDetector(WatermarkBase):
             torch.tensor(offsets),
         )
 
+    # 普通的Detection z-score
     def _score_sequence(
         self,
         input_ids: torch.Tensor,
@@ -444,6 +449,7 @@ class WatermarkDetector(WatermarkBase):
 
         return score_dict
 
+    # 计算
     def _score_windows_impl_batched(
         self,
         input_ids: torch.Tensor,
@@ -459,6 +465,7 @@ class WatermarkDetector(WatermarkBase):
         #    naive_count_correction=True is a partial remedy to this
 
         ngram_to_watermark_lookup, frequencies_table = self._score_ngrams_in_passage(input_ids)
+
         green_mask, green_ids, offsets = self._get_green_at_T_booleans(
             input_ids, ngram_to_watermark_lookup
         )
@@ -532,6 +539,10 @@ class WatermarkDetector(WatermarkBase):
         window_size: str = None,
         window_stride: int = 1,
     ):
+        # windows_size设置一般是："20,40,max"
+
+        # 这一步会执行滑动窗口 z-score 扫描，找到：optimal_z：检测到的最大 z 分数
+        # optimal_z：检测到的最大 z 分数、optimal_window_size：对应窗口大小
         (
             optimal_z,
             optimal_window_size,
@@ -545,9 +556,11 @@ class WatermarkDetector(WatermarkBase):
         if return_num_tokens_scored:
             score_dict.update(dict(num_tokens_scored=optimal_window_size))
 
-        denom = sqrt(optimal_window_size * self.gamma * (1 - self.gamma))
+        denom = sqrt(optimal_window_size * self.gamma * (1 - self.gamma)) # 此时optimal_window_size为总文本个数
+
         green_token_count = int(optimal_z * denom + self.gamma * optimal_window_size)
-        green_fraction = green_token_count / optimal_window_size
+
+        green_fraction = green_token_count / optimal_window_size # 绿集文本个数在该窗口的比例
         if return_num_green_tokens:
             score_dict.update(dict(num_green_tokens=green_token_count))
         if return_green_fraction:

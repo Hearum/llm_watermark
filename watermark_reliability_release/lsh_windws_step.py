@@ -30,16 +30,13 @@ fixed_table = torch.randperm(
     1_000_003, device=torch.device("cpu"), generator=rng
 )  # actually faster than I thought
 
-# 用于将输入的整数张量转换为另一个整数张量，类似于哈希操作（本质上就是最简单的一种哈希，设置一个足够大的table_size然后取模)
-# 利用一个预定义的固定查找表（fixed_table）对输入进行映射，从而实现一种简单且高效的哈希功能。
-def hashint_to_bin(integer_tensor: torch.LongTensor) -> torch.Tensor:
+
+def hashint(integer_tensor: torch.LongTensor) -> torch.Tensor:
     """将整数张量映射为 32 位二进制比特串"""
     # 计算哈希值
-    hash_value = fixed_table[integer_tensor.cpu() % table_size] + 1  # 保证值大于 0
-    
-    # 将哈希值转换为 32 位的二进制字符串
-    # 使用 format 将整数转换为 32 位二进制格式，确保长度为 32 位
-    binary_str = [format(val.item(), '032b') for val in hash_value]
+    fixed_table[integer_tensor.cpu() % table_size] + 1  # 保证值大于 0
+
+    return fixed_table[integer_tensor.cpu() % table_size] + 1
 
     # 返回一个字符串的张量，表示 32 位的二进制比特串
     return torch.tensor([[int(bit) for bit in bin_str] for bin_str in binary_str], device=integer_tensor.device)
@@ -71,6 +68,7 @@ class WatermarkBase:
         threshold_len = 0,
         threshold=0.2,
         windows_h_uesd = False,
+        visualization=False,
     ):
         # patch now that None could now maybe be passed as seeding_scheme
 
@@ -87,17 +85,15 @@ class WatermarkBase:
         self.select_green_tokens = select_green_tokens
 
         # LSH相关初始化
+
         self.threshold_len = threshold_len
         self.n_hashes = n_hashes
-        self.n_features = n_features
-        self.projection_matrix = self._generate_random_projection()
+        # self.projection_matrix = self._generate_random_projection()
         self.lsh_tables = []  # 存储哈希表
-        self.token_embeddings = {}  # 存储token的嵌入向量
-        self.token_signatures = {}  # 存储token的LSH签名
         self.threshold = threshold
-        self.index_len = 32
         self.hash_key = 15485863
-        self.hash_table_ins = self.generate_hash_table_binary_array()
+        self.visualization = visualization
+        # self.hash_table_ins = self.generate_hash_table_binary_array()
 
         # 开启水印窗口的功能
         self.windows_h_uesd = windows_h_uesd
@@ -117,51 +113,46 @@ class WatermarkBase:
         self.prf_type, self.context_width, self.self_salt, self.hash_key = seeding_scheme_lookup(
             seeding_scheme
         )
-
-    def _generate_random_projection(self,):
-        """生成一个随机投影矩阵"""
-        # 使用 torch 来生成标准正态分布的随机矩阵
-        return torch.randn(self.n_features, self.n_features, generator=rng)
-
-    def _hash_function(self, point, projection_matrix):
-        """基于随机投影生成哈希值"""
-        # point 1,32 10,32
-        projected = torch.matmul(point.float(), projection_matrix.to(point.device))
-        return torch.ge(projected, 0).int()  # 返回-1或1
-
-    
-    def generate_hash_table_binary_array(self):
+    def hash_table_binary_array(self,seed):
         # 计算应该有多少个 1
-        K = self.vocab_size // (2 ** self.n_hashes) 
+        K = self.vocab_size // self.n_hashes
         num_ones = int(K * self.gamma)
         # 生成一个长度为 K 的全 0 数组
-        hash_table_ins = {}
-        for hash_table_id in range(2**self.n_hashes):
-            binary_array = torch.zeros(K, dtype=torch.int)
-            reserse_binary_array  = torch.zeros(K, dtype=torch.int)
-            torch.manual_seed(hash_table_id) 
-            # 随机选择 num_ones 个位置设为 1
-            ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
-            res_ones_indices = torch.randperm(K)[-num_ones:] 
-            # 将选择的位置设置为 1
-            binary_array[ones_indices] = 1
-            reserse_binary_array[res_ones_indices] = 1
-            hash_table_ins[hash_table_id] = {"binary_array":binary_array,"reserse_binary_array":reserse_binary_array}
-        return hash_table_ins
-    
 
-    def proj_LSH_Space(self,input_ids: torch.LongTensor,):
-        all_signatures = set()
-        embed_ids = hashint_to_bin(input_ids) 
-        for embed_id in embed_ids:
-            signature = self._hash_function(embed_id, self.projection_matrix)
-            all_signatures.add(signature)
+        binary_array = torch.zeros(K, dtype=torch.int)
+        reserse_binary_array  = torch.zeros(K, dtype=torch.int)
+        torch.manual_seed(seed) 
+        # 随机选择 num_ones 个位置设为 1
+        ones_indices = torch.randperm(K)[:num_ones]  # 随机选择 num_ones 个位置
+        res_ones_indices = torch.randperm(K)[-num_ones:] 
+        # 将选择的位置设置为 1
+        binary_array[ones_indices] = 1
+        reserse_binary_array[res_ones_indices] = 1
+
+        return binary_array
+    def proj_LSH_Space(self,input_ids,next_token):
+        from collections import defaultdict
+        sign_visual = defaultdict(list)  # 使用字典记录哈希表ID和对应的input_ids
+        input_ids = input_ids.to(next_token.device)
+        all_signatures = (input_ids * self.hash_key * next_token) % (self.n_hashes) # simply hash
+ 
+        # for idx, item in enumerate(input_ids):
+        #     signature = (item * self.hash_key * next_token) % (2 ** self.n_hashes)
+        #     sign_visual[int(signature)].append(int(item)) 
         indices = []
-        for hash_table_id in range(2**self.n_hashes):
-            if hash_table_id in all_signatures:
-                indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
+        # hash_table_info = []  # 存储每个哈希表的信息
+        # 计算每个哈希表的分块范围
+        num_hash_tables = self.n_hashes
+        # block_size = self.vocab_size // num_hash_tables
+
+        for hash_table_id in range(self.n_hashes):
+
+            activated = hash_table_id in all_signatures
+            if activated:
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token*hash_table_id))
             else:
-                indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token))
+
         extended_indices = torch.cat(indices)
         if extended_indices.size(0) > self.vocab_size:
             extended_indices = extended_indices[:self.vocab_size]
@@ -170,47 +161,69 @@ class WatermarkBase:
             extended_indices = torch.cat([extended_indices, padding])
         return extended_indices.to(input_ids.device)
 
+    def proj_LSH_Space_info(self,input_ids,next_token):
+        from collections import defaultdict
+        sign_visual = defaultdict(list)  # 使用字典记录哈希表ID和对应的input_ids
+        input_ids = input_ids.to(next_token.device)
+        all_signatures = (input_ids * self.hash_key * next_token) % (self.n_hashes) # simply hash
+ 
+        for idx, item in enumerate(input_ids):
+            signature = (item * self.hash_key * next_token) % (self.n_hashes)
+            sign_visual[int(signature)].append(int(item)) 
+        indices = []
+        hash_table_info = []  # 存储每个哈希表的信息
+        # 计算每个哈希表的分块范围
+        num_hash_tables = self.n_hashes
+        block_size = self.vocab_size // num_hash_tables
 
+        for hash_table_id in range(self.n_hashes):
+            start = hash_table_id * block_size
+            end = (hash_table_id + 1) * block_size if hash_table_id != num_hash_tables -1 else self.vocab_size
+            token_range = (start, end)
+            
+            activated = hash_table_id in all_signatures
+            if activated:
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token*hash_table_id))
+            else:
+                indices.append(self.hash_table_binary_array(self.hash_key*next_token))
+
+            hash_table_info.append({
+                "hash_table_id": hash_table_id,
+                "activated": activated,
+                "input_ids": sign_visual.get(hash_table_id, []),
+                "token_range": token_range,
+                "block_size": block_size,
+            })
+
+        extended_indices = torch.cat(indices)
+        if extended_indices.size(0) > self.vocab_size:
+            extended_indices = extended_indices[:self.vocab_size]
+        elif extended_indices.size(0) < self.vocab_size:
+            padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
+            extended_indices = torch.cat([extended_indices, padding])
+        return extended_indices.to(input_ids.device), hash_table_info
+    
     def _seed_rng(self, next_token: torch.LongTensor) -> None:
         """Seed RNG from local context. Not batched, because the generators we use (like cuda.random) are not batched."""
         prf_key = next_token* self.hash_key 
         self.rng.manual_seed(prf_key.item() % (2**64 - 1)) 
 
 
+
     def find_ids_within_percentile(self, ids: torch.LongTensor, fixed_id: int, threshold: float) -> torch.LongTensor:
-        """
-        返回与指定ID距离最近的百分之threshold的ID（基于距离分位数动态确定阈值）
 
-        参数:
-            ids (torch.LongTensor): 待搜索的ID张量（1维）
-            fixed_id (int): 作为参照的固定ID
-            threshold (float): 百分比阈值（0-100），例如20表示最近的20%的ID
-
-        返回:
-            torch.LongTensor: 满足条件的所有ID组成的张量，按距离升序排列
-
-        示例:
-            >>> ids = torch.LongTensor([5, 2, 8, 3, 10])
-            >>> find_ids_within_percentile(ids, fixed_id=5, threshold=20)
-            tensor([5])  # 距离最近的20%的ID（1个）
-        """
         if len(ids) == 0 or threshold <= 0:
             return torch.empty(0, dtype=torch.long)
+        if len(ids) <=4:
+            return ids
         
-        # 计算距离并排序
-        distances = torch.abs(ids- - fixed_id)
-        sorted_distances, sorted_indices = torch.sort(distances)
-        
-        # 计算需选择的ID数量
         k = int(round(len(ids) * threshold ))
-        k = max(1, min(k, len(ids)))  # 保证至少选择1个
-        
-        # 动态确定距离阈值（包含所有相同距离的ID）
-        max_distance = sorted_distances[k-1]
-        mask = distances <= max_distance
-        
-        # 按距离升序返回结果
-        return ids[sorted_indices][:torch.sum(mask).item()]
+        k = max(4, min(k, len(ids)))  # 保证至少选择4个
+
+        distances = hashint(ids*fixed_id*self.hash_key)
+        sorted_distances, sorted_indices = torch.sort(distances)
+
+        return ids[sorted_indices][:k]
 
     def _get_greenlist_ids(self, input_ids: torch.LongTensor, next_token:torch.LongTensor) -> torch.LongTensor:
         """根据本地上下文宽度生成随机数种子,并使用这些信息生成绿色列表的ID。"""
@@ -220,18 +233,18 @@ class WatermarkBase:
             self.vocab_size, 
             device=input_ids.device,
             generator=self.rng)
-        if self.windows_h_uesd:
-            if input_ids.shape[-1] < self.threshold_len:
-                select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
-            else:
-                select_ids = self.find_ids_within_percentile(ids=input_ids[-self.threshold_len:],fixed_id=next_token,threshold=1) 
-        else:
-            if input_ids.shape[-1] < self.threshold_len:
-                select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
-            else:
-                select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
+        # if self.windows_h_uesd:
+        #     if input_ids.shape[-1] < self.threshold_len:
+        #         select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
+        #     else:
+        #         select_ids = self.find_ids_within_percentile(ids=input_ids[-self.threshold_len:],fixed_id=next_token,threshold=1) 
+        # else:
+        #     if input_ids.shape[-1] < self.threshold_len:
+        #         select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=1) 
+        #     else:
+        #         select_ids = self.find_ids_within_percentile(ids=input_ids,fixed_id=next_token,threshold=self.threshold) 
         
-        extended_indices = self.proj_LSH_Space(input_ids=select_ids)
+        extended_indices = self.proj_LSH_Space(input_ids=input_ids[-self.threshold_len:],next_token=next_token)
         # 
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
         # 4. 选择绿色token
@@ -335,13 +348,13 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
                 final_greenlist.append(prediction_candidate)
             # What follows below are optional early-stopping rules for efficiency
             if tail_rule == "fixed_score":
-                if len(final_greenlist) == 10:
-                    break
+                # if len(final_greenlist) == 10:
+                #     break
                 # 若第一位（最大的）socre已经比下一位score大，后面再加上偏置delta也无法变化，所以没必要继续计算了
                 if sorted_scores[0] - sorted_scores[idx + 1] > self.delta:
-                    if len(final_greenlist)< 1 :
-                        print(self.rejection_count,len(final_greenlist) ,sorted_scores[0] - sorted_scores[idx + 1],False)
-                        self.rejection_count = self.rejection_count+1
+                    # if len(final_greenlist)< 1 :
+                    #     print(self.rejection_count,len(final_greenlist) ,sorted_scores[0] - sorted_scores[idx + 1],False)
+                    #     self.rejection_count = self.rejection_count+1
                     break
             elif tail_rule == "fixed_list_length":
                 if len(final_greenlist) == 10:
@@ -404,24 +417,7 @@ class WatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
 
 
 class WatermarkDetector(WatermarkBase):
-    """This is the detector for all watermarks imprinted with WatermarkLogitsProcessor.
 
-    The detector needs to be given the exact same settings that were given during text generation  to replicate the watermark
-    greenlist generation and so detect the watermark.
-    This includes the correct device that was used during text generation, the correct tokenizer, the correct
-    seeding_scheme name, and parameters (delta, gamma).
-
-    Optional arguments are
-    * normalizers ["unicode", "homoglyphs", "truecase"] -> These can mitigate modifications to generated text that could trip the watermark
-    * ignore_repeated_ngrams -> This option changes the detection rules to count every unique ngram only once.
-    * z_threshold -> Changing this threshold will change the sensitivity of the detector.
-
-    该检测器需要提供与文本生成时完全相同的设置，以便复制水印绿色列表的生成，从而检测水印。这些设置包括生成时使用的正确设备、
-    正确的分词器、正确的 seeding_scheme 名称以及相关参数 delta、gamma。
-    normalizers ["unicode", "homoglyphs", "truecase"] -> 这些可以缓解生成文本中的修改，避免干扰水印检测。
-    ignore_repeated_ngrams -> 该选项修改检测规则,只统计每个唯一的n-gram一次。
-    z_threshold -> 改变该阈值将调整检测器的敏感度。
-    """
 
     def __init__(
         self,
@@ -568,69 +564,6 @@ class WatermarkDetector(WatermarkBase):
         return all_signatures, greenlist_ids_table,input_ids_hash_table
 
 
-    def detect_LSH_Space(self,input_ids: torch.LongTensor,):
-
-        embed_ids = hashint_to_bin(input_ids) 
-        # 获得一个和input_ids一样大小的哈希签名串
-        all_signatures = set()
-        input_ids_hash_table = []
-        greenlist_ids_table =[]
-        greenlist_mask = []
-        for idx, embed_id in enumerate(embed_ids):
-            #pdb.set_trace()
-            if idx < self.threshold_len:     # 跳过签名没有水印的部分 0 1 2 3 4 5
-                signature = self._hash_function(embed_id, self.projection_matrix)
-                input_ids_hash_table.append(set()) # 用于保存第idx的token前面的的签名是什么
-                all_signatures.add(signature) # 动态添加的签名表
-                greenlist_ids_table.append([])
-                continue
-
-            # 从第5个开始的文本就具有水印了
-            # 使用前面几个token的文本
-
-            # 使用前面的几个token的签名为当前token生成红绿词表
-            #all_signatures, greenlist_ids_table,input_ids_hash_table = self.generate_greenlist(idx, embed_id, input_ids, all_signatures, greenlist_ids_table, input_ids_hash_table)
-            if all_signatures in input_ids_hash_table:
-                position = input_ids_hash_table.index(all_signatures)
-                greenlist_ids = greenlist_ids_table[position]
-            else:
-                indices = []
-                for hash_table_id in range(2**self.n_hashes):
-                    if hash_table_id in all_signatures:
-                        indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
-                    else:
-                        indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
-                extended_indices = torch.cat(indices)
-                if extended_indices.size(0) > self.vocab_size:
-                    extended_indices = extended_indices[:self.vocab_size]
-                elif extended_indices.size(0) < self.vocab_size:
-                    padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
-                    extended_indices = torch.cat([extended_indices, padding])
-                extended_indices = extended_indices.to(input_ids.device)
-
-                self._seed_rng(input_ids[idx])
-                vocab_permutation = torch.randperm(
-                            self.vocab_size, 
-                            device=input_ids.device,
-                            generator=self.rng)
-                pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
-                if self.select_green_tokens:  # 直接选择
-                    greenlist_ids = vocab_permutation[pointwise_results > 0] 
-                else:  # 通过红色token反选模式
-                    greenlist_ids = vocab_permutation[pointwise_results <= 0] 
-
-                if input_ids[idx] in greenlist_ids:
-                    greenlist_mask.append(True)
-                else:
-                    greenlist_mask.append(False)
-
-            input_ids_hash_table.append(copy.deepcopy(all_signatures)) 
-            greenlist_ids_table.append(greenlist_ids)
-            # 添加当前token的签名到集合内
-            signature = self._hash_function(embed_id, self.projection_matrix)
-            all_signatures.add(signature) # jia
-        assert len(all_signatures)==len(input_ids)
-        return all_signatures, greenlist_ids_table, input_ids_hash_table, greenlist_mask
 
     def _score_sequence_old(
         self,
@@ -994,6 +927,51 @@ def test_no_watermark_test():
     result = detector.detect(text=attacked_text)
     for key, value in result.items():
         print(f"{key}: {value}")
+def detector_only():
+
+    # 指定可见的 GPU 设备
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    # 初始化 Accelerator
+    #args = Args(gamma=0.25, delta=2.0, max_new_tokens=100,n_hashes=4,threshold=0.4, use_sampling=False, sampling_temp=0.9, n_beams=3)
+
+    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    # model = AutoModelForCausalLM.from_pretrained("/home/shenhm/documents/download/model_ckpt/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True,device_map = "auto")
+    # device =model.device
+    
+
+    #print(f"Generating with {args}")
+    device = torch.device("cuda")
+    torch.manual_seed(48)  
+
+    text = """Red Hat (Nasdaq: RHAT) nearly doubled its first quarter sales from a year ago and reported a smaller-than-expected loss.\nAfter market close on Thursday, Linux bellwether Red Hat reported a first quarter operating loss of $2.5 million, or 2 cents a share. That loss figure adjusts for non-cash, merger, acquisition and other expenses. In the same quarter a year ago, Red Hat reported an operating loss of $3.8 million, or 8 cents a share.\nGross margins improved to 54 percent for the quarter ending May 31.\nIn a statement, CEO Matthew Szulik said the company is executing well and working toward its goal to double revenue and become profitable in calendar 2001. On Red Hat's fourth quarter conference call, officials projected the company would be profitable by the end of 2002. First Call had projected Red Hat to break even in the November quarter of 2002.\n\"The operating loss will decrease for the balance of 2000 until we reach profitability in 2001,\" said Harold Covert, Chief Financial Officer.\nBecause of a seasonal slowdown, Covert said revenue growth in the second quarter will be up 75 percent in the next quarter. The third and fourth quarter sales figures will approach Red Hat's 100 percent growth goal.\nDuring the first quarter, Red Hat announced a slew of deals and strategic alliances. It closed the acquisition of Bluecurve, unveiled a marketplace featuring vendors such as Dell (Nasdaq: DELL), Compaq (NYSE: CPQ), IBM (NYSE: IBM), Oracle (Nasdaq: ORCL), Rackspace.com and Zonetrader.com. Red Hat Linux also gained traction via partnerships with IBM, Dell and Intel (Nasdaq: INTC).\nAt the end of the first quarter, Red Hat had about $106 million in cash and cash equivalents. Red Hat competes with Caldera Systems (Nasdaq: CALD) and Corel (Nasdaq: CORL). It also competes with VA Linux (Nasdaq: LNUX), primarily a hardware vendor, on some fronts.", "textwm": " Red Hat, a leading provider of Linux-based solutions, reported its first quarter financial results on Thursday after market close. The company nearly doubled its sales from the same quarter last year, with gross margins improving to 54 percent. Despite an operating loss of $2.5 million, or 2 cents per share, Red Hat is on track to achieve its goal of doubling revenue and becoming profitable in 2001.\n\nKey Highlights:\n\n* Revenue for the first quarter ended May 31, 2000, was $33.3 million, a 96 percent increase from $16.9 million in the same quarter last year.\n* Operating loss for the quarter was $2.5 million, or 2 cents per share, compared to an operating loss of $3.8 million, or 8 cents per share, in the same quarter last year.\n* Gross margins improved to 54 percent in the first quarter, up from 46 percent in the same quarter last year.\n* Red Hat signed several strategic alliances and deals during the quarter, including the acquisition of Bluecurve and partnerships with IBM, Dell, and Intel.\n* The company ended the quarter with $106 million in cash and cash equivalents.\n\nCommenting on the results, Red Hat CEO Matthew Szulik said, \"We are executing well and making progress toward our goal of doubling revenue and becoming profitable in 2001. We are seeing growing demand for Linux-based solutions in the enterprise, and we are committed to leveraging this momentum to drive growth and profitability.\"\n\nCFO Harold Covert added, \"While we expect revenue growth to slow in the second quarter due to a seasonal slowdown, we anticipate sales in the third and fourth quarters to approach our 100 percent growth goal. We are on track to achieve our objectives for 2001 and are committed to driving shareholder value.\"\n\nRed Hat competes with Caldera Systems and Corel in the Linux market, as well as with VA Linux, which focuses on hardware sales. The company's shares were up 11 percent in after-hours trading following the announcement."""
+    detector = WatermarkDetector(
+        threshold_len=6,
+        gamma=0.25,
+        delta=5,
+        device=device,
+        tokenizer=tokenizer,
+        vocab=list(tokenizer.get_vocab().values()),
+        z_threshold=4.0,
+        normalizers=["unicode"],
+        ignore_repeated_ngrams=False,
+        n_hashes=6,
+        visualization = True,
+    )
+    
+    result = detector.detect(text=text)
+    # 输出结果
+
+    print("watermark_out检测结果:")
+    for key, value in result.items():
+        if key != "info":
+            print(f"{key}: {value}")
+
+    all_activated = [item['activated'] for item in result['info'] if item is not None]
+    print(f"SelfHash rate={sum(all_activated)}, Unigran rate={len(all_activated)-sum(all_activated)}")
+
+    len_input_ids = [len(item['input_ids']) for item in result['info'] if item is not None]
+    print(f"advantage rate={sum(len_input_ids)/len(all_activated)}")
+
 if __name__ == '__main__':
-    test_no_watermark_test()
+    detector_only()
     # test_detector()
