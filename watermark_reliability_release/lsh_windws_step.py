@@ -943,7 +943,7 @@ def detector_only():
     device = torch.device("cuda")
     torch.manual_seed(48)  
 
-    text = """Red Hat (Nasdaq: RHAT) nearly doubled its first quarter sales from a year ago and reported a smaller-than-expected loss.\nAfter market close on Thursday, Linux bellwether Red Hat reported a first quarter operating loss of $2.5 million, or 2 cents a share. That loss figure adjusts for non-cash, merger, acquisition and other expenses. In the same quarter a year ago, Red Hat reported an operating loss of $3.8 million, or 8 cents a share.\nGross margins improved to 54 percent for the quarter ending May 31.\nIn a statement, CEO Matthew Szulik said the company is executing well and working toward its goal to double revenue and become profitable in calendar 2001. On Red Hat's fourth quarter conference call, officials projected the company would be profitable by the end of 2002. First Call had projected Red Hat to break even in the November quarter of 2002.\n\"The operating loss will decrease for the balance of 2000 until we reach profitability in 2001,\" said Harold Covert, Chief Financial Officer.\nBecause of a seasonal slowdown, Covert said revenue growth in the second quarter will be up 75 percent in the next quarter. The third and fourth quarter sales figures will approach Red Hat's 100 percent growth goal.\nDuring the first quarter, Red Hat announced a slew of deals and strategic alliances. It closed the acquisition of Bluecurve, unveiled a marketplace featuring vendors such as Dell (Nasdaq: DELL), Compaq (NYSE: CPQ), IBM (NYSE: IBM), Oracle (Nasdaq: ORCL), Rackspace.com and Zonetrader.com. Red Hat Linux also gained traction via partnerships with IBM, Dell and Intel (Nasdaq: INTC).\nAt the end of the first quarter, Red Hat had about $106 million in cash and cash equivalents. Red Hat competes with Caldera Systems (Nasdaq: CALD) and Corel (Nasdaq: CORL). It also competes with VA Linux (Nasdaq: LNUX), primarily a hardware vendor, on some fronts.", "textwm": " Red Hat, a leading provider of Linux-based solutions, reported its first quarter financial results on Thursday after market close. The company nearly doubled its sales from the same quarter last year, with gross margins improving to 54 percent. Despite an operating loss of $2.5 million, or 2 cents per share, Red Hat is on track to achieve its goal of doubling revenue and becoming profitable in 2001.\n\nKey Highlights:\n\n* Revenue for the first quarter ended May 31, 2000, was $33.3 million, a 96 percent increase from $16.9 million in the same quarter last year.\n* Operating loss for the quarter was $2.5 million, or 2 cents per share, compared to an operating loss of $3.8 million, or 8 cents per share, in the same quarter last year.\n* Gross margins improved to 54 percent in the first quarter, up from 46 percent in the same quarter last year.\n* Red Hat signed several strategic alliances and deals during the quarter, including the acquisition of Bluecurve and partnerships with IBM, Dell, and Intel.\n* The company ended the quarter with $106 million in cash and cash equivalents.\n\nCommenting on the results, Red Hat CEO Matthew Szulik said, \"We are executing well and making progress toward our goal of doubling revenue and becoming profitable in 2001. We are seeing growing demand for Linux-based solutions in the enterprise, and we are committed to leveraging this momentum to drive growth and profitability.\"\n\nCFO Harold Covert added, \"While we expect revenue growth to slow in the second quarter due to a seasonal slowdown, we anticipate sales in the third and fourth quarters to approach our 100 percent growth goal. We are on track to achieve our objectives for 2001 and are committed to driving shareholder value.\"\n\nRed Hat competes with Caldera Systems and Corel in the Linux market, as well as with VA Linux, which focuses on hardware sales. The company's shares were up 11 percent in after-hours trading following the announcement."""
+    text = """Jericho recently appeared on TV\u2019s \u201cCelebrity Apprentice\u201d (he was fired) and hosts a popular podcast. \nWednesday, January 31, 2018, 7 p.m.\nAustin Lucas. He\u2019ll play the Soda Bar on January 31.\nAustin Lucas spent 15 years in Indiana before moving to Nashville in 2013. His new album, Stay Wild, features a song produced by John Angell (Golden Sun, Jonny Quest). He\u2019ll play the Soda Bar on January 31."""
     detector = WatermarkDetector(
         threshold_len=6,
         gamma=0.25,
@@ -957,20 +957,30 @@ def detector_only():
         n_hashes=6,
         visualization = True,
     )
-    
-    result = detector.detect(text=text)
-    # 输出结果
+    while True:
+        # 读取用户输入
+        text = input("请输入文本（或输入 'exit' 退出）：")
+        
+        # 判断是否退出
+        if text.lower() == 'exit':
+            print("退出程序")
+            break
 
-    print("watermark_out检测结果:")
-    for key, value in result.items():
-        if key != "info":
-            print(f"{key}: {value}")
+        # 调用检测器进行检测
+        result = detector.detect(text=text)
 
-    all_activated = [item['activated'] for item in result['info'] if item is not None]
-    print(f"SelfHash rate={sum(all_activated)}, Unigran rate={len(all_activated)-sum(all_activated)}")
+        # 输出水印检测结果
+        print("watermark_out检测结果:")
+        for key, value in result.items():
+            if key != "info":
+                print(f"{key}: {value}")
 
-    len_input_ids = [len(item['input_ids']) for item in result['info'] if item is not None]
-    print(f"advantage rate={sum(len_input_ids)/len(all_activated)}")
+        # # 提取并计算激活率和其他指标
+        # all_activated = [item['activated'] for item in result['info'] if item is not None]
+        # print(f"SelfHash rate={sum(all_activated)}, Unigran rate={len(all_activated) - sum(all_activated)}")
+
+        # len_input_ids = [len(item['input_ids']) for item in result['info'] if item is not None]
+        # print(f"advantage rate={sum(len_input_ids) / len(all_activated)}")
 
 if __name__ == '__main__':
     detector_only()

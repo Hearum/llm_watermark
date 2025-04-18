@@ -7,7 +7,7 @@ export CUDA_VISIBLE_DEVICES=2
 
 if [ -z "$1" ]; then
     echo "没有提供 PATH_DIR,使用默认路径。"
-    PATH_DIR="/home/shenhm/documents/temp/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_4_0.4_LSH_v3.0_c4"
+    PATH_DIR="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Our_test/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_wikitext"
     echo "使用的 PATH_DIR: $PATH_DIR"
 else
     PATH_DIR="$1"
@@ -20,7 +20,7 @@ if [[ "$PATH_DIR" == *"KWG"* ]]; then
         --config_path="$PATH_DIR""/gen_table_meta.json" 
         #--seeding_scheme=ff-anchored_minhash_prf-4-True-15485863\
 else
-    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score.py \
+    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_windows.py \
         --data_path="$PATH_DIR""/gen_table_GPT.jsonl" \
         --config_path="$PATH_DIR""/gen_table_meta.json" 
 fi

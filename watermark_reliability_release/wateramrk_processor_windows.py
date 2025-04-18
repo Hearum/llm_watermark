@@ -110,7 +110,7 @@ class WatermarkBase:
             
     def _initialize_seeding_scheme(self, seeding_scheme: str) -> None:
         """Initialize all internal settings of the seeding strategy from a colloquial, "public" name for the scheme."""
-        self.prf_type, self.context_width, self.self_salt, self.hash_key = seeding_scheme_lookup(
+        self.prf_type, self.threshold_len, self.self_salt, self.hash_key = seeding_scheme_lookup(
             seeding_scheme
         )
     def hash_table_binary_array(self,seed):
@@ -523,98 +523,238 @@ class WatermarkDetector(WatermarkBase):
         p_value = scipy.stats.norm.sf(z)
         return p_value
 
-    def generate_greenlist(self, idx, embed_id, input_ids, all_signatures, greenlist_ids_table, input_ids_hash_table):
-        # 计算当前token的签名
-        signature = self._hash_function(embed_id, self.projection_matrix)
-        input_ids_hash_table.append(copy.deepcopy(all_signatures))  # 保留当前token使用的签名集合
+    # def generate_greenlist(self, idx, embed_id, input_ids, all_signatures, greenlist_ids_table, input_ids_hash_table):
+    #     # 计算当前token的签名
+    #     signature = self._hash_function(embed_id, self.projection_matrix)
+    #     input_ids_hash_table.append(copy.deepcopy(all_signatures))  # 保留当前token使用的签名集合
 
-        # 使用前面几个token的签名为当前token生成红绿词表
-        indices = []
-        for hash_table_id in range(2**self.n_hashes):
-            if hash_table_id in all_signatures:
-                indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
-            else:
-                indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
-        extended_indices = torch.cat(indices)
-        if extended_indices.size(0) > self.vocab_size:
-            extended_indices = extended_indices[:self.vocab_size]
-        elif extended_indices.size(0) < self.vocab_size:
-            padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
-            extended_indices = torch.cat([extended_indices, padding])
+    #     # 使用前面几个token的签名为当前token生成红绿词表
+    #     indices = []
+    #     for hash_table_id in range(2**self.n_hashes):
+    #         if hash_table_id in all_signatures:
+    #             indices.append(self.hash_table_ins[hash_table_id]["binary_array"])
+    #         else:
+    #             indices.append(self.hash_table_ins[hash_table_id]["reserse_binary_array"])
+    #     extended_indices = torch.cat(indices)
+    #     if extended_indices.size(0) > self.vocab_size:
+    #         extended_indices = extended_indices[:self.vocab_size]
+    #     elif extended_indices.size(0) < self.vocab_size:
+    #         padding = torch.zeros(self.vocab_size - extended_indices.size(0), dtype=torch.int)
+    #         extended_indices = torch.cat([extended_indices, padding])
         
-        extended_indices = extended_indices.to(input_ids.device)
-        # 初始化随机数生成器
-        self._seed_rng(input_ids[idx])
-        vocab_permutation = torch.randperm(
-            self.vocab_size, 
-            device=input_ids.device,
-            generator=self.rng
+    #     extended_indices = extended_indices.to(input_ids.device)
+    #     # 初始化随机数生成器
+    #     self._seed_rng(input_ids[idx])
+    #     vocab_permutation = torch.randperm(
+    #         self.vocab_size, 
+    #         device=input_ids.device,
+    #         generator=self.rng
+    #     )
+    #     pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
+    #     if self.select_green_tokens:  # 直接选择
+    #         greenlist_ids = vocab_permutation[pointwise_results > 0]
+    #     else:  # 通过红色token反选模式
+    #         greenlist_ids = vocab_permutation[pointwise_results <= 0] 
+
+    #     greenlist_ids_table.append(greenlist_ids)
+
+    #     # 添加当前token的签名到集合内
+    #     signature = self._hash_function(embed_id, self.projection_matrix)
+    #     all_signatures.add(signature)
+    #     return all_signatures, greenlist_ids_table,input_ids_hash_table
+    # 判断一个 n-gram（由 prefix 和 target 构成）是否是“绿色”。使用 @lru_cache 缓存结果，避免重复计算。
+    @lru_cache(maxsize=2**32)
+    def _get_ngram_score_cached(self, prefix: tuple[int], target: int):
+        """Expensive re-seeding and sampling is cached."""
+        # Handle with care, should ideally reset on __getattribute__ access to self.prf_type, self.threshold_len, self.self_salt, self.hash_key
+        greenlist_ids = self._get_greenlist_ids(torch.as_tensor(prefix, device=self.device),torch.as_tensor(prefix[-1], device=self.device))
+        return True if target in greenlist_ids else False
+
+    # 提取输入文本中的所有 n-gram，并为每个 n-gram 标记是否带水印。
+    def _score_ngrams_in_passage(self, input_ids: torch.Tensor):
+        """Core function to gather all ngrams in the input and compute their watermark."""
+        if len(input_ids) - self.threshold_len < 1:
+            raise ValueError(
+                f"Must have at least {1} token to score after "
+                f"the first min_prefix_len={self.threshold_len} tokens required by the seeding scheme."
+            )
+
+        # Compute scores for all ngrams contexts in the passage:
+        self.self_salt = True
+        token_ngram_generator = ngrams(
+            input_ids.cpu().tolist(), self.threshold_len + 1 - self.self_salt # self.self_sal代表（self-seeding）的机制，如果为 True，则包含整个 n-gram；否则只取前缀
         )
-        pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
-        if self.select_green_tokens:  # 直接选择
-            greenlist_ids = vocab_permutation[pointwise_results > 0]
-        else:  # 通过红色token反选模式
-            greenlist_ids = vocab_permutation[pointwise_results <= 0] 
 
-        greenlist_ids_table.append(greenlist_ids)
+        frequencies_table = collections.Counter(token_ngram_generator) # 统计每种 n-gram 出现次数。
+        ngram_to_watermark_lookup = {}
 
-        # 添加当前token的签名到集合内
-        signature = self._hash_function(embed_id, self.projection_matrix)
-        all_signatures.add(signature)
-        return all_signatures, greenlist_ids_table,input_ids_hash_table
+        for idx, ngram_example in enumerate(frequencies_table.keys()):
+            prefix = ngram_example if self.self_salt else ngram_example[:-1]
+            target = ngram_example[-1]
+            ngram_to_watermark_lookup[ngram_example] = self._get_ngram_score_cached(prefix, target)
 
+        return ngram_to_watermark_lookup, frequencies_table
+    
+    def _get_green_at_T_booleans(self, input_ids, ngram_to_watermark_lookup) -> tuple[torch.Tensor]:
+        """Generate binary list of green vs. red per token, a separate list that ignores repeated ngrams, and a list of offsets to
+        convert between both representations:
+        green_token_mask = green_token_mask_unique[offsets] except for all locations where otherwise a repeat would be counted
+        """
+        green_token_mask, green_token_mask_unique, offsets = [], [], []
+        used_ngrams = {}
+        unique_ngram_idx = 0
+        ngram_examples = ngrams(input_ids.cpu().tolist(), self.threshold_len + 1 - self.self_salt)
 
-
-    def _score_sequence_old(
+        for idx, ngram_example in enumerate(ngram_examples):
+            green_token_mask.append(ngram_to_watermark_lookup[ngram_example])
+            if self.ignore_repeated_ngrams:
+                if ngram_example in used_ngrams:
+                    pass
+                else:
+                    used_ngrams[ngram_example] = True
+                    unique_ngram_idx += 1
+                    green_token_mask_unique.append(ngram_to_watermark_lookup[ngram_example])
+            else:
+                green_token_mask_unique.append(ngram_to_watermark_lookup[ngram_example])
+                unique_ngram_idx += 1
+            offsets.append(unique_ngram_idx - 1)
+        return (
+            torch.tensor(green_token_mask),
+            torch.tensor(green_token_mask_unique),
+            torch.tensor(offsets),
+        )
+    
+    def _score_windows_impl_batched(
         self,
-        input_ids: torch.Tensor,  # 输入的token序列
-        return_num_tokens_scored: bool = True,  # 是否返回被评分的token数量 
-        return_num_green_tokens: bool = True,   # 是否返回绿色token数量
-        return_green_fraction: bool = True,     # 是否返回绿色token比例
-        return_green_token_mask: bool = False,  # 是否返回绿色token掩码
-        return_z_score: bool = True,           # 是否返回z分数
-        return_z_at_T: bool = True,            # 是否返回每个位置的z分数
-        return_p_value: bool = True,           # 是否返回p值
+        input_ids: torch.Tensor,
+        window_size: str,
+        window_stride: int = 1,
     ):
+        # Implementation details:
+        # 1) --ignore_repeated_ngrams is applied globally, and windowing is then applied over the reduced binary vector
+        #      this is only one way of doing it, another would be to ignore bigrams within each window (maybe harder to parallelize that)
+        # 2) These windows on the binary vector of green/red hits, independent of threshold_len, in contrast to Kezhi's first implementation
+        # 3) z-scores from this implementation cannot be directly converted to p-values, and should only be used as labels for a
+        #    ROC chart that calibrates to a chosen FPR. Due, to windowing, the multiple hypotheses will increase scores across the board#
+        #    naive_count_correction=True is a partial remedy to this
 
-   
-        all_signatures, greenlist_ids_table, input_ids_hash_table, greenlist_mask=self.detect_LSH_Space(input_ids=input_ids)
+        ngram_to_watermark_lookup, frequencies_table = self._score_ngrams_in_passage(input_ids)
 
-        num_tokens_scored = len(greenlist_mask)
-        green_token_count = sum(greenlist_mask)
+        green_mask, green_ids, offsets = self._get_green_at_T_booleans(
+            input_ids, ngram_to_watermark_lookup
+        )
+        len_full_context = len(green_ids)
+
+        partial_sum_id_table = torch.cumsum(green_ids, dim=0)
+
+        if window_size == "max":
+            # could start later, small window sizes cannot generate enough power
+            # more principled: solve (T * Spike_Entropy - g * T) / sqrt(T * g * (1 - g)) = z_thresh for T
+            sizes = range(1, len_full_context)
+        else:
+            sizes = [int(x) for x in window_size.split(",") if len(x) > 0]
+
+        z_score_max_per_window = torch.zeros(len(sizes))
+        cumulative_eff_z_score = torch.zeros(len_full_context)
+        s = window_stride
+
+        window_fits = False
+        for idx, size in enumerate(sizes):
+            if size <= len_full_context:
+                # Compute hits within window for all positions in parallel:
+                window_score = torch.zeros(len_full_context - size + 1, dtype=torch.long)
+                # Include 0-th window
+                window_score[0] = partial_sum_id_table[size - 1]
+                # All other windows from the 1st:
+                window_score[1:] = partial_sum_id_table[size::s] - partial_sum_id_table[:-size:s]
+
+                # Now compute batched z_scores
+                batched_z_score_enum = window_score - self.gamma * size
+                z_score_denom = sqrt(size * self.gamma * (1 - self.gamma))
+                batched_z_score = batched_z_score_enum / z_score_denom
+
+                # And find the maximal hit
+                maximal_z_score = batched_z_score.max()
+                z_score_max_per_window[idx] = maximal_z_score
+
+                z_score_at_effective_T = torch.cummax(batched_z_score, dim=0)[0]
+                cumulative_eff_z_score[size::s] = torch.maximum(
+                    cumulative_eff_z_score[size::s], z_score_at_effective_T[:-1]
+                )
+                window_fits = True  # successful computation for any window in sizes
+
+        if not window_fits:
+            raise ValueError(
+                f"Could not find a fitting window with window sizes {window_size} for (effective) context length {len_full_context}."
+            )
+
+        # Compute optimal window size and z-score
+        cumulative_z_score = cumulative_eff_z_score[offsets]
+        optimal_z, optimal_window_size_idx = z_score_max_per_window.max(dim=0)
+        optimal_window_size = sizes[optimal_window_size_idx]
+        return (
+            optimal_z,
+            optimal_window_size,
+            z_score_max_per_window,
+            cumulative_z_score,
+            green_mask,
+        )
+
+        return score_dict         
+    def _score_sequence_window(
+        self,
+        input_ids: torch.Tensor,
+        return_num_tokens_scored: bool = True,
+        return_num_green_tokens: bool = True,
+        return_green_fraction: bool = True,
+        return_green_token_mask: bool = False,
+        return_z_score: bool = True,
+        return_z_at_T: bool = True,
+        return_p_value: bool = True,
+        window_size: str = None,
+        window_stride: int = 1,
+    ):
+        # windows_size设置一般是："20,40,max"
+
+        # 这一步会执行滑动窗口 z-score 扫描，找到：optimal_z：检测到的最大 z 分数
+        # optimal_z：检测到的最大 z 分数、optimal_window_size：对应窗口大小
+        (
+            optimal_z,
+            optimal_window_size,
+            _,
+            z_score_at_T,
+            green_mask,
+        ) = self._score_windows_impl_batched(input_ids, window_size, window_stride)
+
         # HF-style output dictionary
-        # 更新字典内容
         score_dict = dict()
         if return_num_tokens_scored:
-            score_dict.update(dict(num_tokens_scored=num_tokens_scored))
+            score_dict.update(dict(num_tokens_scored=optimal_window_size))
+
+        denom = sqrt(optimal_window_size * self.gamma * (1 - self.gamma)) # 此时optimal_window_size为总文本个数
+
+        green_token_count = int(optimal_z * denom + self.gamma * optimal_window_size)
+
+        green_fraction = green_token_count / optimal_window_size # 绿集文本个数在该窗口的比例
         if return_num_green_tokens:
             score_dict.update(dict(num_green_tokens=green_token_count))
         if return_green_fraction:
-            score_dict.update(dict(green_fraction=(green_token_count / num_tokens_scored)))
+            score_dict.update(dict(green_fraction=green_fraction))
         if return_z_score:
-            score_dict.update(
-                dict(z_score=self._compute_z_score(green_token_count, num_tokens_scored))
-            )
+            score_dict.update(dict(z_score=optimal_z))
+        if return_z_at_T:
+            score_dict.update(dict(z_score_at_T=z_score_at_T))
         if return_p_value:
-            z_score = score_dict.get("z_score")
-            if z_score is None:
-                z_score = self._compute_z_score(green_token_count, num_tokens_scored)
+            z_score = score_dict.get("z_score", optimal_z)
             score_dict.update(dict(p_value=self._compute_p_value(z_score)))
+
+        # Return per-token results for mask. This is still the same, just scored by windows
+        # todo would be to mark the actually counted tokens differently
         if return_green_token_mask:
-            score_dict.update(dict(green_token_mask=greenlist_mask))
-        # if return_z_at_T:
-        #     # Score z_at_T separately:
-        #     sizes = torch.arange(1, len(green_unique) + 1)
-        #     seq_z_score_enum = torch.cumsum(green_unique, dim=0) - self.gamma * sizes
-        #     seq_z_score_denom = torch.sqrt(sizes * self.gamma * (1 - self.gamma))
-        #     z_score_at_effective_T = seq_z_score_enum / seq_z_score_denom
-        #     z_score_at_T = z_score_at_effective_T[offsets]
-        #     assert torch.isclose(z_score_at_T[-1], torch.tensor(z_score))
+            score_dict.update(dict(green_token_mask=green_mask.tolist()))
 
-        #     score_dict.update(dict(z_score_at_T=z_score_at_T))
-
-        return score_dict         
-
+        return score_dict
+    
     # 计算文本水印的核心代码
     def _score_sequence(
         self,
@@ -633,7 +773,7 @@ class WatermarkDetector(WatermarkBase):
             raise ValueError(
                 (
                     f"Must have at least {1} token to score after "
-                    f"the first min_prefix_len={self.min_prefix_len} tokens required by the seeding scheme."
+                    f"the first min_prefix_len tokens required by the seeding scheme."
                 )
             )
         green_token_count, green_token_mask = 0, []
@@ -736,7 +876,20 @@ class WatermarkDetector(WatermarkBase):
         # call score method
         output_dict = {}
 
-        score_dict = self._score_sequence(tokenized_text, **kwargs)
+        if window_size is not None:
+            # assert window_size <= len(tokenized_text) cannot assert for all new types
+            score_dict = self._score_sequence_window(
+                tokenized_text,
+                window_size=window_size,
+                window_stride=window_stride,
+                **kwargs,
+            )
+            output_dict.update(score_dict)
+        else:
+            score_dict = self._score_sequence(tokenized_text, **kwargs)
+
+        # score_dict = self._score_sequence(tokenized_text, **kwargs)
+        
         if return_scores:
             output_dict.update(score_dict)
         # if passed return_prediction then perform the hypothesis test and return the outcome

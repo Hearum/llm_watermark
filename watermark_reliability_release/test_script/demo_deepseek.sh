@@ -15,7 +15,7 @@ if [[ "$PATH_DIR" == *"KWG"* ]]; then
         --config_path="$PATH_DIR""/gen_table_meta.json" 
         #--seeding_scheme=ff-anchored_minhash_prf-4-True-15485863\
 else
-    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score.py \
+    python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_z_score_windows.py \
         --data_path="$PATH_DIR""/gen_table_deepseek_attacker.jsonl" \
         --config_path="$PATH_DIR""/gen_table_meta.json" 
 fi

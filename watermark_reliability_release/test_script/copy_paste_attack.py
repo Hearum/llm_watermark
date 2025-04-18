@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table.jsonl",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
@@ -58,13 +58,13 @@ def parse_args():
                         choices=["single-single", "triple-single", "k-t"],
                         help="Type of copy-paste attack to apply")
     
-    parser.add_argument("--cp_attack_insertion_len", type=int, default=30,
+    parser.add_argument("--cp_attack_insertion_len", type=int, default=13,
                         help="Length of each inserted fragment")
     # 插入片段数量（k），仅用于 k-t 攻击
     parser.add_argument("--cp_attack_num_insertions", type=int, default=3,
                         help="Number of insertions to perform (only for k-t attack)")
     # 最小 token 数要求，用于判断样本是否足够长才能攻击
-    parser.add_argument("--cp_attack_min_len", type=int, default=150,
+    parser.add_argument("--cp_attack_min_len", type=int, default=250,
                         help="Minimum token count required for an example to be attacked")
     parser.add_argument("--verbose", action="store_true",
                         help="Whether to print detailed debug info during attack")

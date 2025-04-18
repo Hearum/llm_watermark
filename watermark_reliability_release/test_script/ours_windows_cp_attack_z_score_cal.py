@@ -1,7 +1,7 @@
 
 import sys
 sys.path.append("/home/shenhm/documents/lm-watermarking/watermark_reliability_release")
-from watermark_processor_kwg import WatermarkDetector
+from wateramrk_processor_windows import WatermarkDetector
 import os
 import json
 from copy import deepcopy
@@ -27,13 +27,13 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_k-t_t_13_k_3.jsonl",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table_k-t_t_13_k_3.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
         "--config_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_meta.json",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table_meta.json",
     )
     parser.add_argument(
         "--seeding_scheme",
@@ -115,7 +115,6 @@ def load_z_scores(file_path,key):
     # np.nanmax(machine_z_scores)
     # np.nanmax(human_z_scores)
     # sum(machine_z_scores) / len(machine_z_scores)
-    pdb.set_trace()
     return human_z_scores, machine_z_scores
 
 def load_z_scores_2(file_path,key):
@@ -266,12 +265,19 @@ def main():
             z_threshold=args.detection_z_threshold,
             # normalizers=args.normalizers,
             ignore_repeated_ngrams=args.ignore_repeated_ngrams,
+            n_hashes = config_data.get('n_hashes'),               # LSH的哈希函数数量，决定了有多少个桶
+            # n_features=config_data.get('n_features'),            # 每个哈希函数的维度
+            threshold=config_data.get('threshold'),
+            visualization=True,
+            threshold_len=config_data.get('h_win'),
+            windows_h_uesd  = True
         )
         data = []
         with open(args.data_path, 'r', encoding='utf-8') as file:
             for line in file:
                 data.append(json.loads(line.strip()))
-
+        # data = data[:20]
+        # pdb.set_trace()
         for item in tqdm(data):
             # textwm w_wm_output_attacked
             for key in [ "w_wm_output_attacked","no_wm_output","w_wm_output"]:

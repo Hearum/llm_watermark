@@ -2,9 +2,9 @@
 #!/bin/bash
 export CUDA_VISIBLE_DEVICES=1
 
-PATH_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/Ours_full/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_16_LSH_v3.0_c4
-O=60
-L=60
+PATH_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_wikitext
+O=20
+L=20
 
 python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
     --data_path="$PATH_DIR""/gen_table.jsonl" \
@@ -23,8 +23,9 @@ fi
 
 python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/cal_auc_roc.py \
     --data_path="$PATH_DIR""/gen_table_dipper_O${O}_L${L}.jsonl_z_score" 
-O=20
-L=20
+    
+O=60
+L=60
 
 python /home/shenhm/documents/lm-watermarking/watermark_reliability_release/test_script/dipper_attack.py \
     --data_path="$PATH_DIR""/gen_table.jsonl" \
