@@ -35,8 +35,8 @@ def load_z_scores(file_path):
             data.append(json.loads(line.strip()))
 
     # Assuming 'w_wm_output_z_score' and 'no_wm_output_z_score' are the relevant keys
-    human_z_scores = [entry['no_wm_output_z_score'] for entry in data]
-    machine_z_scores = [entry['w_wm_output_attacked_z_score'] for entry in data]
+    human_z_scores = [entry['no_wm_output_z_score'] for entry in data if entry.get('no_wm_output_length', 0) > 150]
+    machine_z_scores = [entry['w_wm_output_attacked_z_score'] for entry in data if entry.get('w_wm_output_attacked_length', 0) > 150] 
     
     return human_z_scores, machine_z_scores
 

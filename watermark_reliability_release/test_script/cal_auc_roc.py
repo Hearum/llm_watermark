@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/windows_text/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6__0.25_LSH_H_6_c4/gen_table_deepseek_attacker.jsonl_z_score",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width__skipgram_wikit_ff-anchored_minhash_prf-6-True-15485863/gen_table_GPT.jsonl_z_score",
         help="Path to the data file containing the z-scores"
     )
     return parser.parse_args()
@@ -37,10 +37,10 @@ def load_z_scores(file_path):
             data.append(json.loads(line.strip()))
 
     # Assuming 'w_wm_output_z_score' and 'no_wm_output_z_score' are the relevant keys
-    human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data]
-    # w_wm_output_attacked_z_score  w_wm_output_z_score
-    machine_z_scores = [entry.get('w_wm_output_attacked_z_score', math.nan) for entry in data]
-    
+    human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data ]
+
+    machine_z_scores = [entry.get('w_wm_output_attacked_z_score', math.nan) for entry in data ] 
+
     return human_z_scores, machine_z_scores
 
 def load_z_scores_2(file_path):
@@ -50,9 +50,10 @@ def load_z_scores_2(file_path):
             data.append(json.loads(line.strip()))
 
     # Assuming 'w_wm_output_z_score' and 'no_wm_output_z_score' are the relevant keys
-    human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data]
+    human_z_scores = [entry.get('no_wm_output_z_score', math.nan) for entry in data if entry.get('no_wm_output_length', 0) >= 150]
     # w_wm_output_attacked_z_score  w_wm_output_z_score
-    machine_z_scores = [entry.get('w_wm_output_z_score', math.nan) for entry in data]
+    machine_z_scores = [entry.get('w_wm_output_z_score', math.nan) for entry in data if entry.get('w_wm_output_length', 0) >= 150]
+
     return human_z_scores, machine_z_scores
 
 def get_roc_auc(human_z, machine_z):
@@ -148,6 +149,7 @@ def main():
 
         # Calculate AUC-ROC and TPR values
         roc_auc, fpr, tpr, _ = get_roc_auc(human_z, machine_z)
+       
         print(f"ROC AUC: {roc_auc}")
         result_file.write(f"ROC AUC: {roc_auc}\n")
 

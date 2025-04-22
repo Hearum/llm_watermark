@@ -8,7 +8,7 @@ export HF_ENDPOINT=https://hf-mirror.com
 export CUDA_VISIBLE_DEVICES=0
 
 MODEL_NAME=llama_7B
-DATASET=c4
+DATASET=lfqa
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
 #     --dataset_name=c4
@@ -17,10 +17,10 @@ DATASET=c4
 DELTA=5
 GAMMA=0.25
 
-N_HASHES=6
+N_HASHES=16
 THRESHOLD=0.25
 GENERATE_LEN=150
-H=6
+H=16
 
 # LLAMA 13b /home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-13b-hf/snapshots/5c31dfb671ce7cfe2d7bb7c04375e44c55e815b1
 # LLAMA 7b /home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9
@@ -42,7 +42,7 @@ else
 fi
 
 
-OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/${DATASET}/Our_test/len_${GENERATE_LEN}
+OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/${DATASET}/Ours_fin/len_${GENERATE_LEN}
 RUN_NAME=${MODEL_NAME}_N500_T200_no_filter_batch_1_delta_${DELTA}_gamma_${GAMMA}_LshParm_${N_HASHES}_LSH_H_${H}_${DATASET}
 
 GENERATION_OUTPUT_DIR="$OUTPUT_DIR"/"$RUN_NAME"
@@ -52,7 +52,7 @@ python generation_pipeline.py \
     --model_name=$LLAMA_PATH \
     --dataset_name=$DATASET \
     --dataset_config_name=wikitext-103-raw-v1  \
-    --max_new_tokens=100 \
+    --max_new_tokens=150 \
     --model_max_generation_tokens=$GENERATE_LEN \
     --min_generations=500 \
     --input_truncation_strategy=prompt_length \

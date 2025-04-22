@@ -170,11 +170,35 @@ def convert_item(item):
             item[key] = float(value)  # 转换为 Python 原生的 float
     return item
 
+def read_data_from_file(data_path):
+    data = []
+    try:
+        with open(data_path, 'r', encoding='utf-8') as file:
+            for line in file:
+                data.append(json.loads(line.strip()))  # 读取每一行并转换为字典
+        print(f"Data loaded successfully from {data_path}")
+    except Exception as e:
+        print(f"Error while loading data from {data_path}: {e}")
+    return data
 
 def main(data_path):
     
     args = parse_args()
     data = []
+    output_file = data_path + '_psp'
+    if os.path.exists(output_file):
+        print('#' * 50, "result", '#' * 50)
+        data = read_data_from_file(output_file)
+        print('#' * 50, "result", '#' * 50)
+        psp_values = [item.get('wm_and_no_wm_psp', float('nan')) for item in data if not math.isnan(item.get('wm_and_no_wm_psp', float('nan')))]
+        if psp_values:
+            mean_psp = np.mean(psp_values)
+        else:
+            mean_psp = math.nan
+        print("Mean wm_and_no_wm_psp:", mean_psp)
+        return
+    
+
     with open(data_path, 'r', encoding='utf-8') as file:
         for line in file:
             data.append(json.loads(line.strip()))
@@ -233,12 +257,12 @@ def main(data_path):
                 raise
 
     # 写回 JSONL 文件
-    with open(data_path + '_psp', 'w', encoding='utf-8') as file:
+    with open(output_file, 'w', encoding='utf-8') as file:
         for item in data:
             item = convert_item(item)
             file.write(json.dumps(item, ensure_ascii=False) + "\n")
 
-    print(f"Updated JSONL file saved to: {data_path + '_psp'}")
+    print(f"Updated JSONL file saved to: {output_file }")
 
     # 打印结果
     print('#' * 50, "result", '#' * 50)
@@ -250,7 +274,13 @@ def main(data_path):
     print("Mean wm_and_no_wm_psp:", mean_psp)
 
 if __name__ == '__main__':
-    paths = ["/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_z_score_ppl",]
+    paths = [
+            "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl",
+            "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf16-4-True-15485863/gen_table.jsonl",
+            "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf32-4-True-15485863/gen_table.jsonl",
+            "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf128-4-True-15485863/gen_table.jsonl",
+             "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf1-4-True-15485863/gen_table.jsonl",
+        ]
 
     for path in paths:
         main(path)
