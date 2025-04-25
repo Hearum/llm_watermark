@@ -5,7 +5,7 @@ export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_rel
 export HF_ENDPOINT=https://hf-mirror.com
 
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=3
 
 MODEL_NAME=llama_7B
 DATASET=lfqa
@@ -42,7 +42,7 @@ else
 fi
 
 
-OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/${DATASET}/Ours_fin/len_${GENERATE_LEN}
+OUTPUT_DIR=/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/${DATASET}/Ours_4.0_test/len_${GENERATE_LEN}
 RUN_NAME=${MODEL_NAME}_N500_T200_no_filter_batch_1_delta_${DELTA}_gamma_${GAMMA}_LshParm_${N_HASHES}_LSH_H_${H}_${DATASET}
 
 GENERATION_OUTPUT_DIR="$OUTPUT_DIR"/"$RUN_NAME"
@@ -52,7 +52,7 @@ python generation_pipeline.py \
     --model_name=$LLAMA_PATH \
     --dataset_name=$DATASET \
     --dataset_config_name=wikitext-103-raw-v1  \
-    --max_new_tokens=150 \
+    --max_new_tokens=$GENERATE_LEN \
     --model_max_generation_tokens=$GENERATE_LEN \
     --min_generations=500 \
     --input_truncation_strategy=prompt_length \

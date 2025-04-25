@@ -85,94 +85,113 @@ def check_missing_z_scores(data):
 from tqdm import tqdm
 import math
 
+def read_data_from_file(data_path):
+    data = []
+    try:
+        with open(data_path, 'r', encoding='utf-8') as file:
+            for line in file:
+                data.append(json.loads(line.strip()))  # 读取每一行并转换为字典
+        print(f"Data loaded successfully from {data_path}")
+    except Exception as e:
+        print(f"Error while loading data from {data_path}: {e}")
+    return data
 
 def main(data_path):
-    
     args = parse_args()
     data = []
+    model_id = 'gpt2'#"facebook/opt-2.7b"
+
+    output_file = data_path + f'_{model_id}_ppl140'
+
+    if os.path.exists(output_file):
+        print('#' * 50, "result", '#' * 50)
+        data = read_data_from_file(output_file)
+        for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output", "baseline_completion"]:
+            valid_ppls = [item.get(f"{key}_ppl", float('nan')) for item in data if not math.isnan(item.get(f"{key}_ppl", float('nan')))]
+            if valid_ppls:
+                mean_ppl = np.mean(valid_ppls)
+            else:
+                mean_ppl = math.nan
+            print(key, mean_ppl)
+        return
+    
     with open(data_path, 'r', encoding='utf-8') as file:
         for line in file:
             data.append(json.loads(line.strip()))
 
     perplexity = load("perplexity", module_type="metric")
-    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9", local_files_only=True)
+    
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    # model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto", torch_dtype="auto")
 
-    batch_size = 32  # 可以根据实际内存和计算能力调整批次大小
-    batch_data = []  # 用于存储当前批次的文本
-    batch_keys = []  # 用于存储对应文本的key（用于后续赋值）
+    all_texts = []
+    all_keys = []
 
     for item in tqdm(data):
-        for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output", "baseline_completion"]:
+        for key in ["w_wm_output", "no_wm_output", "baseline_completion"]:
             input_text = item.get(key, "")
             if isinstance(input_text, str):
-                # 对输入文本进行编码并限制最大长度为160
-                tokens = tokenizer.encode(input_text, truncation=True, max_length=160)
-                input_text = tokenizer.decode(tokens, skip_special_tokens=True)
+                tokens = tokenizer.encode(input_text)[:200]
+                input_text = tokenizer.decode(tokens)
             else:
-                # 如果不是字符串，处理为默认值
                 print(f"Warning: Expected a string for key '{key}', but got {type(input_text)}")
-                input_text = ""  
+                input_text = ""
                 tokens = []
 
-            # 如果 `input_text` 非空并且 tokens 长度大于1，则加入 batch_data
-            if input_text and len(tokens) > 10:
-                    batch_data.append(input_text)
-                    batch_keys.append((item, key))
+            if input_text and len(tokens) > 140:
+                all_texts.append(input_text)
+                all_keys.append((item, key))
             else:
-                # 处理短文本或空文本的情况
                 print(f"Skipping short input for key '{key}' in item (token length: {len(tokens)})")
+                item[f"{key}_ppl"] = math.nan
 
-            # 如果当前批次已经达到设定的大小，则计算困惑度
-            if len(batch_data) >= batch_size:
-                try:
-                    results = perplexity.compute(model_id='gpt2', add_start_token=False, predictions=batch_data)
-                    for idx, (item, key) in enumerate(batch_keys):
-                        if 'perplexities' in results:
-                            item[f"{key}_ppl"] = round(results["perplexities"][idx], 2)
-                        else:
-                            item[f"{key}_ppl"] = math.nan
-                except (ValueError,AssertionError) as e:
-                    if "Must have at least 1 token" in str(e):
-                        for idx, (item, key) in enumerate(batch_keys):
-                            item[f"{key}_ppl"] = math.nan
-                    else:
-                        raise
-                batch_data = []
-                batch_keys = []
-
-    # 处理剩余的文本（如果有）
-    if batch_data:
+    # 一次性计算所有 PPL
+    if all_texts:
         try:
-            results = perplexity.compute(model_id='gpt2', add_start_token=False, predictions=batch_data)
-            for idx, (item, key) in enumerate(batch_keys):
+            results = perplexity.compute(
+                model_id=model_id,
+                predictions=all_texts,
+                add_start_token=False
+            )
+            for idx, (item, key) in enumerate(all_keys):
                 if 'perplexities' in results:
                     item[f"{key}_ppl"] = round(results["perplexities"][idx], 2)
                 else:
                     item[f"{key}_ppl"] = math.nan
-        except ValueError as e:
-            if "Must have at least 1 token" in str(e):
-                for idx, (item, key) in enumerate(batch_keys):
-                    item[f"{key}_ppl"] = math.nan
-            else:
-                raise
+        except (ValueError, AssertionError) as e:
+            print(f"Error during PPL computation: {e}")
+            for _, (item, key) in enumerate(all_keys):
+                item[f"{key}_ppl"] = math.nan
 
     # 写回 JSONL 文件
-    with open(data_path+'_ppl', 'w', encoding='utf-8') as file:
+    with open(output_file, 'w', encoding='utf-8') as file:
         for item in data:
             file.write(json.dumps(item, ensure_ascii=False) + "\n")
 
-    print(f"Updated JSONL file saved to: {data_path + '_ppl'}")
-    # 打印结果
+    print(f"Updated JSONL file saved to: {output_file}")
     print('#' * 50, "result", '#' * 50)
     for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output", "baseline_completion"]:
         valid_ppls = [item.get(f"{key}_ppl", float('nan')) for item in data if not math.isnan(item.get(f"{key}_ppl", float('nan')))]
-        if valid_ppls:
-            mean_ppl = np.mean(valid_ppls)
-        else:
-            mean_ppl = math.nan
+        mean_ppl = np.mean(valid_ppls) if valid_ppls else math.nan
         print(key, mean_ppl)
+    return
 if __name__ == '__main__':
-    paths = ["/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_z_score",]
+    paths = {
+        "WikiText_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Ours_fin/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_wikitext/gen_table_GPT.jsonl_z_score",
+        "C4_Ours": "/home/shenhm/documents/temp/c4/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_c4/gen_table_GPT.jsonl_z_score",
+        "LFQA_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_lfqa/gen_table_GPT.jsonl_z_score",
+        "WikiText_Ours2": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Ours_fin/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_wikitext/gen_table_GPT.jsonl_z_score",
+        "C4_Ours2": "/home/shenhm/documents/temp/c4/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table_GPT.jsonl_z_score",
+        "LFQA_Ours2": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_lfqa/gen_table_GPT.jsonl_z_score",
+        "WikiText_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_z_score",
+        "text2":"/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/KWG_TEST/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-32-True-15485863/gen_table.jsonl",
+        "text3":"/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/KWG_TEST/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf4-32-True-15485863/gen_table.jsonl",
+        "text3":"/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/KWG_TEST/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf4-32-True-15485863/gen_table.jsonl",
+        # "C4_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl_z_score",
+        # "LFQA_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_GPT.jsonl_z_score",
+        # "text1":"/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table.jsonl",
+        # "text2":"/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl"
+    }
 
-    for path in paths:
+    for path in paths.values():
         main(path)

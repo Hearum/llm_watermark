@@ -168,7 +168,8 @@ class WatermarkBase:
             
             activated = hash_table_id in all_signatures
             if activated:
-                indices.append(self.hash_table_binary_array(hash_table_id))
+                indices.append(self.hash_table_binary_array(hash_table_id*self.hash_key*next_token))
+                #indices.append(self.hash_table_binary_array(hash_table_id))
             else:
                 indices.append(self.hash_table_binary_array(self.hash_key*next_token))
 

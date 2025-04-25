@@ -27,13 +27,13 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/temp/c4/KWG_TEST/len_150/llama_13B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_GPT.jsonl",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-3-True-15485863/gen_table.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
         "--config_path",
         type=str,
-        default="/home/shenhm/documents/temp/c4/KWG_TEST/len_150/llama_13B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_meta.json",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-3-True-15485863/gen_table_meta.json",
     )
     parser.add_argument(
         "--seeding_scheme",

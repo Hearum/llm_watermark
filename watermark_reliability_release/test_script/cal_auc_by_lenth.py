@@ -1,120 +1,187 @@
+
+import sys
+sys.path.append("/home/shenhm/documents/lm-watermarking/watermark_reliability_release")
+from wateramrk_processor_windows import WatermarkDetector
+
 import os
 import json
-import numpy as np
-import matplotlib.pyplot as plt
-import sklearn.metrics as metrics
-import argparse  # 使用 argparse 代替 HfArgumentParser
+from copy import deepcopy
+from types import NoneType
 
+from typing import Union
+import numpy as np
+import sklearn.metrics as metrics
+import argparse  
+import torch
+from utils.submitit import str2bool  # better bool flag type for argparse
+from functools import partial
+from dataclasses import dataclass
+import os
+import json
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from torch.nn.functional import softmax
+import pdb
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--human_fname",
-        type=str,
-        default="outputs_human",
-        help="File name of human code detection results",
-    )
-    parser.add_argument(
-        "--machine_fname",
-        type=str,
-        default="outputs",
-        help="File name of machine code detection results",
-    )
     parser.add_argument(
         "--data_path",
         type=str,
-         default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_eval_cp/gen_table_w_metrics.jsonl",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table.jsonl",
         help="Path to the data file containing the z-scores"
+    )
+    parser.add_argument(
+        "--config_path",
+        type=str,
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table_meta.json",
+    )
+    parser.add_argument(
+        "--seeding_scheme",
+        type=str,
+        default="ff-anchored_minhash_prf-6-True-15485863",
+        help="The seeding procedure to use for the watermark.",
+    )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default="0.25",
+    )
+    parser.add_argument(
+        "--detection_z_threshold",
+        type=float,
+        default=4.0,
+        help="The test statistic threshold for the detection hypothesis test.",
+    )
+    parser.add_argument(
+        "--n_hashes",
+        type=int,
+        default=5,
+    )    
+    # parser.add_argument(
+    #     "--n_features",
+    #     type=int,
+    #     default=32,
+    # )    
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.2,
+    )
+    # parser.add_argument(
+    #     "--normalizers",
+    #     type=Union[str, NoneType],
+    #     default=None,
+    #     help="Single or comma separated list of the preprocessors/normalizer names to use when performing watermark detection.",
+    # )
+    parser.add_argument(
+        "--ignore_repeated_ngrams",
+        type=str2bool,
+        default=False,
+        help="Whether to use the detection method that only counts each unqiue bigram once as either a green or red hit.",
     )
     return parser.parse_args()
 
-
-def load_z_scores(file_path):
-    data = []
-    with open(file_path, 'r', encoding='utf-8') as file:
-        for line in file:
-            data.append(json.loads(line.strip()))
-
-    # 提取相关字段
-    human_z_scores = [entry['no_wm_output_z_score'] for entry in data]
-    machine_z_scores = [entry['w_wm_output_attacked_z_score'] for entry in data]
-    text_lengths = [entry['w_wm_output_length'] for entry in data]  # 使用 'w_wm_output_length' 作为文本长度
+def check_missing_z_scores(data):
+    missing_count = 0
+    for idx, entry in enumerate(data):
+        # 检查 'w_wm_output_z_score' 是否存在
+        if 'w_wm_output_z_score' not in entry:
+            missing_count += 1
+            print(f"Missing 'w_wm_output_z_score' in entry {idx}: {entry}")
+        
+        # 检查其他可能缺少的 z_score 字段
+        if 'w_wm_output_attacked_z_score' not in entry:
+            missing_count += 1
+            print(f"Missing 'w_wm_output_attacked_z_score' in entry {idx}: ")
+        
+        if 'no_wm_output_z_score' not in entry:
+            missing_count += 1
+            print(f"Missing 'no_wm_output_z_score' in entry {idx}")
     
-    return human_z_scores, machine_z_scores, text_lengths
-
-def clean_z_scores(human_z, machine_z):
-    # Filter out any NaN values from both human_z and machine_z
-    valid_human_z = [z for z in human_z if not np.isnan(z)]
-    valid_machine_z = [z for z in machine_z if not np.isnan(z)]
-    # Ensure both lists are of the same length
-    min_len = min(len(valid_human_z), len(valid_machine_z))
-    return valid_human_z[:min_len], valid_machine_z[:min_len]
-
-def get_roc_auc(human_z, machine_z):
-    assert len(human_z) == len(machine_z)
-    # 合并人类和机器的 z-score
-    human_z, machine_z = clean_z_scores(human_z, machine_z)
-    all_scores = np.concatenate([np.array(human_z), np.array(machine_z)])
-    
-    # 生成标签（0 为人类，1 为机器）
-    baseline_labels = np.zeros_like(human_z)
-    watermark_labels = np.ones_like(machine_z)
-    all_labels = np.concatenate([baseline_labels, watermark_labels])
-
-    # 计算 ROC 曲线和 AUC
-    fpr, tpr, thresholds = metrics.roc_curve(all_labels, all_scores, pos_label=1)
-    roc_auc = metrics.auc(fpr, tpr)
-
-    return roc_auc, fpr, tpr, thresholds
-
-
-def plot_auc_vs_length(human_z, machine_z, text_lengths):
-    # 定义文本长度区间（可以根据实际情况调整）
-    length_bins = np.arange(0, max(text_lengths) + 100, 10)
-    
-    auc_values = []
-    length_centers = []
-    
-    for i in range(len(length_bins) - 1):
-        # 获取落入当前区间的文本长度
-        bin_start = length_bins[i]
-        bin_end = length_bins[i + 1]
-        
-        # 筛选出落入该区间的样本索引
-        indices = [idx for idx, length in enumerate(text_lengths) if bin_start <= length < bin_end]
-        
-        if not indices:
-            continue
-        
-        # 获取该区间的 z-scores
-        human_z_bin = [human_z[idx] for idx in indices]
-        machine_z_bin = [machine_z[idx] for idx in indices]
-        
-        # 计算该区间的 AUC-ROC
-        roc_auc, _, _, _ = get_roc_auc(human_z_bin, machine_z_bin)
-        
-        auc_values.append(roc_auc)
-        length_centers.append((bin_start + bin_end) / 2)  # 以区间的中点作为横坐标
-
-    # 绘制 AUC vs. 文本长度的曲线
-    plt.plot(length_centers, auc_values, marker='o', linestyle='-', color='b')
-    plt.xlabel("Text Length")
-    plt.ylabel("AUC-ROC")
-    plt.title("AUC-ROC vs Text Length")
-    plt.grid(True)
-    plt.savefig('/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/test_script/fig/AUCROC-Length.png')
-
+    # 输出缺少 z_score 的条目数量
+    if missing_count > 0:
+        print(f"\nTotal {missing_count} entries are missing z_score fields.")
+    else:
+        print("\nAll entries have the required z_score fields.")
+from tqdm import tqdm
+import math
+import pdb
 
 def main():
     args = parse_args()
+    # with open(args.config_path, 'r', encoding='utf-8') as infile:
+    #     config_data = json.load(infile)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9",local_files_only=True)
+    with open(args.config_path, 'r', encoding='utf-8') as infile:
+        config_data = json.load(infile)
+    # watermark_detector = WatermarkDetector(
+    #     gamma=args.gamma,
+    #     delta=args.delta,
+    #     device=device,
+    #     tokenizer=tokenizer,
+    #     vocab=list(tokenizer.get_vocab().values()),
+    #     z_threshold=4.0,
+    #     normalizers=["unicode"],
+    #     ignore_repeated_ngrams=False,
+    #     threshold_len=16,
+    #     windows_h_uesd  = True
+    # )
+    watermark_detector = WatermarkDetector(
+        vocab=list(tokenizer.get_vocab().values()),
+        gamma=config_data.get('gamma'),
+        seeding_scheme=config_data.get('seeding_scheme'),
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        tokenizer=tokenizer,
+        z_threshold=args.detection_z_threshold,
+        # normalizers=args.normalizers,
+        ignore_repeated_ngrams=args.ignore_repeated_ngrams,
+        n_hashes = config_data.get('n_hashes'),               # LSH的哈希函数数量，决定了有多少个桶
+        # n_features=config_data.get('n_features'),            # 每个哈希函数的维度
+        threshold=config_data.get('threshold'),
+        visualization=True,
+        threshold_len=config_data.get('h_win'),
+        windows_h_uesd  = True
+    )
+    data = []
+    with open(args.data_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            data.append(json.loads(line.strip()))
 
-    # 加载 z-scores 和文本长度
-    human_z, machine_z, text_lengths = load_z_scores(args.data_path)
+    # 遍历数据并计算 z_score
+    for item in tqdm(data):
+        for key in ["w_wm_output"]:
+            input_text = item.get(key, "")  # 获取文本内容
+            if input_text:  # 确保文本不为空
+                # input_text = input_text[:2000]
+                try:
+                    # 调用 watermark_detector.detect 获取 score_dict
+                    score_dict = watermark_detector.detect(
+                                input_text,
+                                return_prediction=False,
+                                convert_to_float=True,
+                            )
+                    # 获取 z_score，如果没有就设置为 NaN
+                    item[f"{key}_z_score"] = score_dict.get("z_score", math.nan)
+                    item[f"{key}_z_score_at_T"] = score_dict.get("z_score_at_T", math.nan).tolist()
+                except ValueError as e:
+                    # 捕获 ValueError 异常，并将 z_score 设置为 NaN
+                    if "Must have at least 1 token" in str(e):
+                        item[f"{key}_z_score"] = math.nan
+                    else:
+                        raise  # 如果是其他 ValueError 异常，重新抛出
+                except ValueError as e:
+                    # 捕获 ValueError 异常，并将 z_score 设置为 NaN
+                    if "Must have at least 1 token" in str(e):
+                        item[f"{key}_z_score"] = math.nan
+                    else:
+                        raise  # 如果是其他 ValueError 异常，重新抛出
+    # 写回 JSONL 文件
+    with open(args.data_path+'_z_score', 'w', encoding='utf-8') as file:
+        for item in data:
+            file.write(json.dumps(item, ensure_ascii=False) + "\n")
+    print(f"Updated JSONL file saved to: {args.data_path+'_z_score'}")
 
-    # 绘制 AUC-ROC 随文本长度变化的曲线图
-    plot_auc_vs_length(human_z, machine_z, text_lengths)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -93,20 +93,7 @@ class WatermarkBase:
         self.threshold = threshold
         self.hash_key = 15485863
         self.visualization = visualization
-        # self.hash_table_ins = self.generate_hash_table_binary_array()
 
-        # 开启水印窗口的功能
-        self.windows_h_uesd = windows_h_uesd
-        if not self.windows_h_uesd:
-            self.threshold_len = 0
-
-    # def precompute_token_hashes(self):
-    #     """预计算整个词表中所有 token 的哈希值并保存在 self.token_embeddings 中。"""
-    #     # 遍历词表中的所有 token，并计算其哈希值
-    #     for token in self.vocab:
-    #         if token not in self.token_embeddings:
-    #             # 计算并缓存每个 token 的哈希值
-    #         self.token_embeddings[token] = custom_hash(token, self.n_features)
             
     def _initialize_seeding_scheme(self, seeding_scheme: str) -> None:
         """Initialize all internal settings of the seeding strategy from a colloquial, "public" name for the scheme."""
@@ -249,7 +236,7 @@ class WatermarkBase:
         pointwise_results = extended_indices.to(vocab_permutation.device) * vocab_permutation
         # 4. 选择绿色token
         if self.select_green_tokens:  # 直接选择
-            greenlist_ids = vocab_permutation[pointwise_results > 0] 
+            greenlist_ids = pointwise_results[pointwise_results > 0]
         return greenlist_ids
     
 
@@ -758,43 +745,41 @@ class WatermarkDetector(WatermarkBase):
     # 计算文本水印的核心代码
     def _score_sequence(
         self,
-        input_ids: torch.Tensor,  # 输入的token序列
-        return_num_tokens_scored: bool = True,  # 是否返回被评分的token数量 
-        return_num_green_tokens: bool = True,   # 是否返回绿色token数量
-        return_green_fraction: bool = True,     # 是否返回绿色token比例
-        return_green_token_mask: bool = False,  # 是否返回绿色token掩码
-        return_z_score: bool = True,           # 是否返回z分数
-        return_z_at_T: bool = True,            # 是否返回每个位置的z分数
-        return_p_value: bool = True,           # 是否返回p值
+        input_ids: torch.Tensor,
+        return_num_tokens_scored: bool = True,
+        return_num_green_tokens: bool = True,
+        return_green_fraction: bool = True,
+        return_green_token_mask: bool = False,
+        return_z_score: bool = True,
+        return_z_at_T: bool = True,
+        return_p_value: bool = True,
     ):
+        ngram_to_watermark_lookup, frequencies_table = self._score_ngrams_in_passage(input_ids)
+        green_token_mask, green_unique, offsets = self._get_green_at_T_booleans(
+            input_ids, ngram_to_watermark_lookup
+        )
 
-        num_tokens_scored = len(input_ids) - self.threshold_len
-        if num_tokens_scored < 1:
-            raise ValueError(
-                (
-                    f"Must have at least {1} token to score after "
-                    f"the first min_prefix_len tokens required by the seeding scheme."
+        # Count up scores over all ngrams
+        if self.ignore_repeated_ngrams:
+            # Method that only counts a green/red hit once per unique ngram.
+            # New num total tokens scored (T) becomes the number unique ngrams.
+            # We iterate over all unqiue token ngrams in the input, computing the greenlist
+            # induced by the context in each, and then checking whether the last
+            # token falls in that greenlist.
+            num_tokens_scored = len(frequencies_table.keys())
+            green_token_count = sum(ngram_to_watermark_lookup.values())
+        else:
+            num_tokens_scored = sum(frequencies_table.values())
+            assert num_tokens_scored == len(input_ids) - self.threshold_len + self.self_salt
+            green_token_count = sum(
+                freq * outcome
+                for freq, outcome in zip(
+                    frequencies_table.values(), ngram_to_watermark_lookup.values()
                 )
             )
-        green_token_count, green_token_mask = 0, []
-        
-        for idx in range(self.threshold_len, len(input_ids)):
-            curr_token = input_ids[idx]
-            greenlist_ids = self._get_greenlist_ids(input_ids[:idx],input_ids[idx])
-            if curr_token in greenlist_ids:
-                green_token_count += 1
-                green_token_mask.append(True)
-            else:
-                green_token_mask.append(False)
-       #all_signatures, greenlist_ids_table, input_ids_hash_table, greenlist_mask=self.detect_LSH_Space(input_ids=input_ids)
+        assert green_token_count == green_unique.sum()
 
         # HF-style output dictionary
-        # 更新字典内容
-        # print(green_token_mask)
-        # pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
-        # print(pos)
-        # print("detector inputids",input_ids)
-
         score_dict = dict()
         if return_num_tokens_scored:
             score_dict.update(dict(num_tokens_scored=num_tokens_scored))
@@ -812,19 +797,89 @@ class WatermarkDetector(WatermarkBase):
                 z_score = self._compute_z_score(green_token_count, num_tokens_scored)
             score_dict.update(dict(p_value=self._compute_p_value(z_score)))
         if return_green_token_mask:
-            score_dict.update(dict(green_token_mask=green_token_mask))
-        # if return_z_at_T:
-        #     # Score z_at_T separately:
-        #     sizes = torch.arange(1, len(green_unique) + 1)
-        #     seq_z_score_enum = torch.cumsum(green_unique, dim=0) - self.gamma * sizes
-        #     seq_z_score_denom = torch.sqrt(sizes * self.gamma * (1 - self.gamma))
-        #     z_score_at_effective_T = seq_z_score_enum / seq_z_score_denom
-        #     z_score_at_T = z_score_at_effective_T[offsets]
-        #     assert torch.isclose(z_score_at_T[-1], torch.tensor(z_score))
+            score_dict.update(dict(green_token_mask=green_token_mask.tolist()))
+        if return_z_at_T:
+            # Score z_at_T separately:
+            sizes = torch.arange(1, len(green_unique) + 1)
+            seq_z_score_enum = torch.cumsum(green_unique, dim=0) - self.gamma * sizes
+            seq_z_score_denom = torch.sqrt(sizes * self.gamma * (1 - self.gamma))
+            z_score_at_effective_T = seq_z_score_enum / seq_z_score_denom
+            z_score_at_T = z_score_at_effective_T[offsets]
+            assert torch.isclose(z_score_at_T[-1], torch.tensor(z_score))
 
-        #     score_dict.update(dict(z_score_at_T=z_score_at_T))
+            score_dict.update(dict(z_score_at_T=z_score_at_T))
 
         return score_dict
+
+    # def _score_sequence(
+    #     self,
+    #     input_ids: torch.Tensor,  # 输入的token序列
+    #     return_num_tokens_scored: bool = True,  # 是否返回被评分的token数量 
+    #     return_num_green_tokens: bool = True,   # 是否返回绿色token数量
+    #     return_green_fraction: bool = True,     # 是否返回绿色token比例
+    #     return_green_token_mask: bool = False,  # 是否返回绿色token掩码
+    #     return_z_score: bool = True,           # 是否返回z分数
+    #     return_z_at_T: bool = True,            # 是否返回每个位置的z分数
+    #     return_p_value: bool = True,           # 是否返回p值
+    # ):
+
+    #     num_tokens_scored = len(input_ids) - self.threshold_len
+    #     if num_tokens_scored < 1:
+    #         raise ValueError(
+    #             (
+    #                 f"Must have at least {1} token to score after "
+    #                 f"the first min_prefix_len tokens required by the seeding scheme."
+    #             )
+    #         )
+    #     green_token_count, green_token_mask = 0, []
+        
+    #     for idx in range(self.threshold_len, len(input_ids)):
+    #         curr_token = input_ids[idx]
+    #         greenlist_ids = self._get_greenlist_ids(input_ids[:idx],input_ids[idx])
+    #         if curr_token in greenlist_ids:
+    #             green_token_count += 1
+    #             green_token_mask.append(True)
+    #         else:
+    #             green_token_mask.append(False)
+    #    #all_signatures, greenlist_ids_table, input_ids_hash_table, greenlist_mask=self.detect_LSH_Space(input_ids=input_ids)
+
+    #     # HF-style output dictionary
+    #     # 更新字典内容
+    #     # print(green_token_mask)
+    #     # pos = [(index,int(input_ids[index]))for index, value in enumerate(green_token_mask) if value]
+    #     # print(pos)
+    #     # print("detector inputids",input_ids)
+
+    #     score_dict = dict()
+    #     if return_num_tokens_scored:
+    #         score_dict.update(dict(num_tokens_scored=num_tokens_scored))
+    #     if return_num_green_tokens:
+    #         score_dict.update(dict(num_green_tokens=green_token_count))
+    #     if return_green_fraction:
+    #         score_dict.update(dict(green_fraction=(green_token_count / num_tokens_scored)))
+    #     if return_z_score:
+    #         score_dict.update(
+    #             dict(z_score=self._compute_z_score(green_token_count, num_tokens_scored))
+    #         )
+    #     if return_p_value:
+    #         z_score = score_dict.get("z_score")
+    #         if z_score is None:
+    #             z_score = self._compute_z_score(green_token_count, num_tokens_scored)
+    #         score_dict.update(dict(p_value=self._compute_p_value(z_score)))
+    #     if return_green_token_mask:
+    #         score_dict.update(dict(green_token_mask=green_token_mask))
+    #     if return_z_at_T:
+    #         # Score z_at_T separately:
+    #         sizes = torch.arange(1, len(green_unique) + 1)
+    #         seq_z_score_enum = torch.cumsum(green_unique, dim=0) - self.gamma * sizes
+    #         seq_z_score_denom = torch.sqrt(sizes * self.gamma * (1 - self.gamma))
+    #         z_score_at_effective_T = seq_z_score_enum / seq_z_score_denom
+    #         z_score_at_T = z_score_at_effective_T[offsets]
+    #         assert torch.isclose(z_score_at_T[-1], torch.tensor(z_score))
+
+    #         score_dict.update(dict(z_score_at_T=z_score_at_T))
+
+    #     return score_dict
     
     def detect(
         self,

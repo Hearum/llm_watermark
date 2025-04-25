@@ -181,7 +181,6 @@ def main(args):
             select_green_tokens=True,
         )
     elif args.LSH_windows:
-        pdb.set_trace()
         watermark_processor = LSH_Win_WatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
                                                        prefix_len=0,
                                                         gamma=args.gamma,
@@ -193,7 +192,6 @@ def main(args):
                                                         windows_h_uesd=True)  
     else:
         
-        pdb.set_trace()
         watermark_processor = KWG_WatermarkLogitsProcessor(
             vocab=list(tokenizer.get_vocab().values()),
             gamma=args.gamma,

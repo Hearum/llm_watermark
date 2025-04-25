@@ -7,8 +7,8 @@ export HF_ENDPOINT=https://hf-mirror.com
 
 export CUDA_VISIBLE_DEVICES=0
 
-MODEL_NAME=llama_7B
-DATASET=c4
+MODEL_NAME=llama_13B
+DATASET=lfqa
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
 #     --dataset_name=c4

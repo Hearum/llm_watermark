@@ -94,15 +94,8 @@ def read_data_from_file(data_path):
     except Exception as e:
         print(f"Error while loading data from {data_path}: {e}")
     return data
-
-def main(data_path):
-    args = parse_args()
-    data = []
-
-    model_id = "gpt2" #"/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9"
-    output_file = data_path + f'_{model_id}'
-
-    if os.path.exists(output_file):
+def show(output_file):
+    if True:
         print('#' * 50, "result", '#' * 50)
         data = read_data_from_file(output_file)
         for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output", "baseline_completion"]:
@@ -114,6 +107,26 @@ def main(data_path):
                 mean_ppl = math.nan
             print(key, mean_ppl)
         return
+    
+def main(data_path):
+    args = parse_args()
+    data = []
+
+    model_id = 'gpt2' # 'facebook/opt-2.7b' #'gpt2' #"/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9"
+    output_file = data_path + f'_{model_id}_160'
+
+    # if os.path.exists(output_file):
+    #     print('#' * 50, "result", '#' * 50)
+    #     data = read_data_from_file(output_file)
+    #     for key in ["w_wm_output", "w_wm_output_attacked", "no_wm_output", "baseline_completion"]:
+    #         valid_ppls = [item.get(f"{key}_ppl", float('nan')) for item in data if not math.isnan(item.get(f"{key}_ppl", float('nan')))][:500]
+    #         # [item.get(f"w_wm_output_ppl", float('nan')) for item in data]
+    #         if valid_ppls:
+    #             mean_ppl = np.mean(valid_ppls)
+    #         else:
+    #             mean_ppl = math.nan
+    #         print(key, mean_ppl)
+    #     return
     
     with open(data_path, 'r', encoding='utf-8') as file:
         for line in file:
@@ -131,9 +144,8 @@ def main(data_path):
         for key in ["w_wm_output", "no_wm_output", "baseline_completion"]:
             input = item.get(key, "")
             if isinstance(input, str):
-                input_text = f"{item['truncated_input']},\n,{input}"
-
-                tokens = tokenizer.encode(input_text, truncation=True, max_length=500)
+                input_text = input
+                tokens = tokenizer.encode(input_text, truncation=True, max_length=160)
                 input_text = tokenizer.decode(tokens, skip_special_tokens=True)
 
             if input_text and item.get(f"{key}_length", "") > 140:
@@ -182,13 +194,9 @@ if __name__ == '__main__':
             #  "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf128-4-True-15485863/gen_table.jsonl",
             "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl",
              "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf1-4-True-15485863/gen_table.jsonl",
-            #  "/home/shenhm/documents/temp/c4/PPL_KWG_TEST_NEW/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf1-3-True-15485863/gen_table.jsonl",
-            #  "/home/shenhm/documents/temp/c4/PPL_KWG_TEST_NEW/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf1-2-True-15485863/gen_table.jsonl",
-            #  "/home/shenhm/documents/temp/c4/PPL_KWG_TEST_NEW/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf4-4-True-15485863/gen_table.jsonl",
-            # #  "/home/shenhm/documents/temp/c4/PPL_KWG_TEST_NEW/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf4-8-True-15485863/gen_table.jsonl",
-            #  "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf16-4-True-15485863/gen_table.jsonl",
-            #  "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf32-4-True-15485863/gen_table.jsonl"
+
              ]
 
     for path in paths:
+    #     show("/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf1-4-True-15485863/gen_table.jsonl_llama_140")
         main(path)

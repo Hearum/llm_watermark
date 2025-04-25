@@ -19,7 +19,7 @@ import collections
 from math import sqrt
 from itertools import chain, tee
 from functools import lru_cache
-
+import pdb
 import scipy.stats
 import torch
 from tokenizers import Tokenizer
@@ -638,6 +638,7 @@ class WatermarkDetector(WatermarkBase):
             output_dict.update(score_dict)
         else:
             score_dict = self._score_sequence(tokenized_text, **kwargs)
+
         if return_scores:
             output_dict.update(score_dict)
         # if passed return_prediction then perform the hypothesis test and return the outcome

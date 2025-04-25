@@ -185,11 +185,10 @@ def main(data_path):
     
     args = parse_args()
     data = []
-    output_file = data_path + '_psp'
+    output_file = data_path + '_psp_ori'
     if os.path.exists(output_file):
         print('#' * 50, "result", '#' * 50)
         data = read_data_from_file(output_file)
-        print('#' * 50, "result", '#' * 50)
         psp_values = [item.get('wm_and_no_wm_psp', float('nan')) for item in data if not math.isnan(item.get('wm_and_no_wm_psp', float('nan')))]
         if psp_values:
             mean_psp = np.mean(psp_values)
@@ -206,7 +205,7 @@ def main(data_path):
     # 不再需要perplexity模块，改为调用evaluate_p_sp来计算P-SP
     tokenizer = AutoTokenizer.from_pretrained("/home/shenhm/.cache/huggingface/hub/models--meta-llama--Llama-2-7b-hf/snapshots/01c7f73d771dfac7d292323805ebc428287df4f9", local_files_only=True)
 
-    batch_size = 32  # 可以根据实际内存和计算能力调整批次大小
+    batch_size = 1024  # 可以根据实际内存和计算能力调整批次大小
     batch_data = []  # 用于存储当前批次的文本
     batch_keys = []  # 用于存储对应文本的key（用于后续赋值）
 
@@ -273,14 +272,16 @@ def main(data_path):
         mean_psp = math.nan
     print("Mean wm_and_no_wm_psp:", mean_psp)
 
-if __name__ == '__main__':
-    paths = [
-            "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl",
-            "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf16-4-True-15485863/gen_table.jsonl",
-            "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf32-4-True-15485863/gen_table.jsonl",
-            "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf128-4-True-15485863/gen_table.jsonl",
-             "/home/shenhm/documents/temp/c4/PPL_KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf1-4-True-15485863/gen_table.jsonl",
-        ]
 
-    for path in paths:
+if __name__ == '__main__':
+    paths = {
+        "WikiText_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Ours_fin/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_wikitext/gen_table_GPT.jsonl_z_score",
+        "C4_Ours": "/home/shenhm/documents/temp/c4/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_c4/gen_table_GPT.jsonl_z_score",
+        "LFQA_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_lfqa/gen_table_GPT.jsonl_z_score",
+        "WikiText_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_z_score",
+        "C4_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl_z_score",
+        "LFQA_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_GPT.jsonl_z_score"
+    }
+
+    for path in paths.values():
         main(path)
