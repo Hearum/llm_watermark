@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_4_gamma_0.25_KWG_selfhash/gen_table.jsonl_z_score",
+        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-3-True-15485863/gen_table_dipper_O60_L60.jsonl_z_score",
         help="Path to the data file containing the z-scores"
     )
     return parser.parse_args()
@@ -113,7 +113,9 @@ def main():
         # First run
         print("Processing first z-scores...")
         human_z, machine_z = load_z_scores_2(args.data_path)
-
+        machine_z=machine_z+machine_z
+        human_z= human_z+human_z
+        pdb.set_trace()
         # Clean NaN values from z-scores
         human_z, machine_z = clean_z_scores(human_z, machine_z)
 
@@ -126,14 +128,15 @@ def main():
         # 找到最接近 FPR = 0.1% (0.001) 的索引
         idx = (np.abs(fpr - 0.001)).argmin()
 
-        # 对应的 z-score threshold
         
         z_score_at_fpr_001 = thresholds[idx]
-        print("z_score_at_fpr_001",z_score_at_fpr_001 )
+        print("z_score_at_fpr_001",z_score_at_fpr_001)
+   
         result_file.write(f"z_score_at_fpr_0001: {z_score_at_fpr_001}\n")
 
         # TPR (FPR = 0.1%)
         tpr_value1 = get_tpr(fpr, tpr, 0.001)
+
         print(f"TPR (FPR = 0.1%): {tpr_value1}")
         result_file.write(f"TPR (FPR = 0.1%): {tpr_value1}\n")
 

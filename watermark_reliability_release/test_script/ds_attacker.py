@@ -59,7 +59,7 @@ import tenacity
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 def gpt_attack(example, attack_prompt=None, args=None):
     assert attack_prompt, "Prompt must be provided for GPT attack"
-    client = OpenAI(api_key="sk-b45d2bf8d14b43019169bae19a6e9d25", base_url="https://api.deepseek.com")
+    client = OpenAI(api_key="sk-deypkpgucnxwbbermnduqpyzohujibfqmnshwkomojeuwfgu", base_url="https://api.siliconflow.cn/v1")
     gen_row = example
 
     original_text = gen_row["w_wm_output"]

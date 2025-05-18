@@ -275,12 +275,18 @@ def main(data_path):
 
 if __name__ == '__main__':
     paths = {
-        "WikiText_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Ours_fin/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_wikitext/gen_table_GPT.jsonl_z_score",
-        "C4_Ours": "/home/shenhm/documents/temp/c4/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_c4/gen_table_GPT.jsonl_z_score",
-        "LFQA_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_lfqa/gen_table_GPT.jsonl_z_score",
-        "WikiText_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_z_score",
-        "C4_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl_z_score",
-        "LFQA_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_GPT.jsonl_z_score"
+    "WikiText_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Ours_fin/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_wikitext/gen_table_GPT.jsonl_z_score_gpt2_ppl140",
+    "C4_Ours": "/home/shenhm/documents/temp/c4/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table_GPT.jsonl_z_score_gpt2_ppl140",
+    "LFQA_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_lfqa/gen_table_GPT.jsonl_z_score_gpt2_ppl140",
+    "WikiText_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_ppl",
+    "C4_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl_ppl",
+    "LFQA_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/delta2_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_self_wiki_c4_new/gen_table_GPT.jsonl_ppl",
+    "WikiText_Ours2": "/home/shenhm/documents/temp/PPL_visualization/wikitext/gen_table.jsonl_gpt2_ppl140",
+    "C4_Ours2": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/llama_13B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_32_0.25_LSH_v2.2_c4_new/gen_table.jsonl_gpt2_ppl140",
+    "LFQA_Ours2": "/home/shenhm/documents/temp/PPL_visualization/lfqa/gen_table.jsonl_gpt2_ppl140",
+    "WikiText_KGW2": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/ppl_Show/len_150/llama_13B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl_gpt2_ppl140",
+    "C4_KGW2": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/len_150/llama_13B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl_gpt2_ppl140",
+    "LFQA_KGW2": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/ppl_Show/len_250/llama_13B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table.jsonl_gpt2_ppl140",
     }
 
     for path in paths.values():

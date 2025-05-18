@@ -7,7 +7,7 @@ export CUDA_VISIBLE_DEVICES=2
 
 if [ -z "$1" ]; then
     echo "没有提供 PATH_DIR,使用默认路径。"
-    PATH_DIR="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/KWG_TEST/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-6-True-15485863"
+    PATH_DIR="/home/shenhm/documents/temp/NEW_BeamSearch4/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-6-True-15485863"
     echo "使用的 PATH_DIR: $PATH_DIR"
 else
     PATH_DIR="$1"

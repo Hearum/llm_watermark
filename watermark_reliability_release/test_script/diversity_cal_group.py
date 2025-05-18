@@ -193,7 +193,7 @@ def compute_repetition_diversity(example, include_repetition=True, include_diver
     for col_name in OUTPUT_TEXT_COLUMN_NAMES:
         if col_name in example:
             try:
-                if example[f"{col_name}_length"] >=1:
+                if example[f"{col_name}_length"] ==150:
                     results_tuple = measure_repetition_and_diversity(example[col_name])
                 else:
                     results_tuple = dummy_rep_div_result
@@ -235,7 +235,7 @@ def main(data_path):
     args = parse_args()
     data = []
 
-    output_file = data_path + '_diversity_20'
+    output_file = data_path + '_diversity_20=150'
 
     if os.path.exists(output_file):
         print('#' * 50, "result", '#' * 50)
@@ -296,15 +296,14 @@ if __name__ == '__main__':
 
     paths = {
         # "WikiText_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Ours_fin/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_wikitext/gen_table_GPT.jsonl_z_score",
-        # "C4_Ours": "/home/shenhm/documents/temp/c4/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_c4/gen_table_GPT.jsonl_z_score",
+        "C4_Ours": "/home/shenhm/documents/temp/c4/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_c4/gen_table_GPT.jsonl_z_score",
         # "C4-4-4":"/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/KWG_TEST/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_4_gamma_0.25_KWG_ff-anchored_minhash_prf4-4-True-15485863/gen_table_GPT.jsonl_z_score",
-        
-        # # "LFQA_Ours": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_lfqa/gen_table_GPT.jsonl_z_score",
+        #"LFQA_Ours": "/home/shenhm/documents/temp/debug_temp_file/new_test_Ours/NEWS_ours_plus_1/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_5_LSH_H_6_c4/gen_table.jsonl",
         # # "WikiText_Ours2": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Ours_fin/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_wikitext/gen_table_GPT.jsonl_z_score",
         # # "C4_Ours2": "/home/shenhm/documents/temp/c4/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table_GPT.jsonl_z_score",
         # # "LFQA_Ours2": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/Our_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_lfqa/gen_table_GPT.jsonl_z_score",
-        # # "WikiText_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/delta5_len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_width_4_selfhash_wikit/gen_table_GPT.jsonl_z_score",
-        "C4_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/KWG_TEST/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf4-16-True-15485863/gen_table.jsonl",
+        #"WikiText_KGW": "/home/shenhm/documents/temp/debug_temp_file/new_test_Ours/NEWS_ours_plus_1/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_12_LSH_H_16_c4/gen_table.jsonl",
+        # "C4_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/Ours_4.0_test/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table.jsonl",
         # "LFQA_KGW": "/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/lfqa/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_KWG_ff-anchored_minhash_prf-4-True-15485863/gen_table_GPT.jsonl_z_score",
         #"text3":"/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/our_NEW_DIVERSITY_SHOW/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_c4/gen_table.jsonl"
         # "text1":"/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/wikitext/Ours_fin/len_150/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_wikitext/gen_table_GPT.jsonl_z_score",

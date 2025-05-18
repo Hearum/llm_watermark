@@ -5,10 +5,10 @@ export HF_HOME=/home/shenhm/doucuments/lm-watermarking/watermark_reliability_rel
 export HF_ENDPOINT=https://hf-mirror.com
 
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=2
 
 MODEL_NAME=llama_7B
-DATASET=lfqa
+DATASET=c4
 #    --dataset_name=wikitext \
 #    --dataset_config_name=wikitext-103-raw-v1 \
 #     --dataset_name=c4
@@ -17,7 +17,7 @@ DATASET=lfqa
 DELTA=5
 GAMMA=0.25
 
-N_HASHES=16
+N_HASHES=11
 THRESHOLD=0.25
 GENERATE_LEN=150
 H=16
@@ -54,7 +54,7 @@ python generation_pipeline.py \
     --dataset_config_name=wikitext-103-raw-v1  \
     --max_new_tokens=$GENERATE_LEN \
     --model_max_generation_tokens=$GENERATE_LEN \
-    --min_generations=500 \
+    --min_generations=300 \
     --input_truncation_strategy=prompt_length \
     --min_prompt_tokens=100 \
     --input_filtering_strategy=prompt_and_completion_length \

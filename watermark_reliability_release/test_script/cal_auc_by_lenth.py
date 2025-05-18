@@ -28,13 +28,13 @@ def parse_args():
     parser.add_argument(
         "--data_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table.jsonl",
+        default="/home/shenhm/documents/temp/PPL_Visualization/llama_7B_N500_T200_no_filter_batch_1_delta_4_gamma_0.25_LshParm_16_LSH_H_16_c4/gen_table_dipper_O60_L60.jsonl",
         help="Path to the data file containing the z-scores"
     )
     parser.add_argument(
         "--config_path",
         type=str,
-        default="/home/shenhm/documents/lm-watermarking/watermark_reliability_release/output/c4/CP_attack/len_250/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_6_LSH_H_6_c4/gen_table_meta.json",
+        default="/home/shenhm/documents/temp/PPL_Visualization/llama_7B_N500_T200_no_filter_batch_1_delta_5_gamma_0.25_LshParm_16_LSH_H_16_c4/gen_table_meta.json",
     )
     parser.add_argument(
         "--seeding_scheme",
@@ -151,7 +151,7 @@ def main():
 
     # 遍历数据并计算 z_score
     for item in tqdm(data):
-        for key in ["w_wm_output"]:
+        for key in ["w_wm_output","w_wm_output_attacked"]:
             input_text = item.get(key, "")  # 获取文本内容
             if input_text:  # 确保文本不为空
                 # input_text = input_text[:2000]
@@ -181,7 +181,7 @@ def main():
     with open(args.data_path+'_z_score', 'w', encoding='utf-8') as file:
         for item in data:
             file.write(json.dumps(item, ensure_ascii=False) + "\n")
-    print(f"Updated JSONL file saved to: {args.data_path+'_z_score'}")
+    print(f"Updated JSONL file saved to: {args.data_path+'_z_score_visualization'}")
 
 if __name__ == '__main__':
     main()

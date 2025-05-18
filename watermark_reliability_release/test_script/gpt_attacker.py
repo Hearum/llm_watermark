@@ -59,7 +59,7 @@ import tenacity
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 def gpt_attack(example, attack_prompt=None, args=None):
     assert attack_prompt, "Prompt must be provided for GPT attack"
-    client = OpenAI(api_key="sk-m6u0zvn57TSjyOAl59D4D8974dEa48F9999f428f26Ad146f", base_url="https://zmgpt.cc/v1")
+    client = OpenAI(api_key="sk-b45d2bf8d14b43019169bae19a6e9d25", base_url="https://api.deepseek.com")
     gen_row = example
 
     original_text = gen_row["w_wm_output"]
@@ -157,7 +157,7 @@ def main():
                 continue
 
             data_item = json.loads(line.strip())  # 读取并解析每一行数据
-            if data_item["w_wm_output_length"] < 50:
+            if data_item["w_wm_output_length"] < 140:
                 print(data_item["w_wm_output_length"],"is too short, pass")
                 continue
             updated_item = gpt_attack(data_item, attack_prompt=prompt, args=None)
